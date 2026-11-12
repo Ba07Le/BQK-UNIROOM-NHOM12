@@ -231,7 +231,25 @@ function bookingForm(id, name, capacity) {
       alertMsg("Đã gửi yêu cầu. Booking đang chờ duyệt.");
       dashboardPage();
     } catch (x) {
-      alertMsg(x.message, "danger");
+      if (x.message.includes("booking giao") || x.message.includes("đã có booking")) {
+        const f = new FormData(e.target);
+        const o = Object.fromEntries(f);
+        o.room_id = Number(o.room_id);
+        o.attendee_count = Number(o.attendee_count);
+        const area = document.createElement("div");
+        area.className = "alert alert-warning mt-3";
+        area.innerHTML = `<strong>Khung giờ đã có lịch đặt.</strong><p class="mb-2">Bạn có thể tham gia danh sách chờ và được thông báo khi phòng trống.</p><button type="button" class="btn btn-primary btn-sm">Tham gia Waitlist</button>`;
+        e.target.querySelector(".waitlist-conflict")?.remove();
+        area.classList.add("waitlist-conflict");
+        area.querySelector("button").onclick = async () => {
+          try {
+            await api("/waitlist", {method:"POST", body:o});
+            alertMsg("Đã đăng ký danh sách chờ thành công");
+            dashboardPage();
+          } catch (err) { alertMsg(err.message,"danger"); }
+        };
+        e.target.appendChild(area);
+      } else alertMsg(x.message, "danger");
     }
   };
 }
@@ -242,6 +260,7 @@ async function dashboardPage() {
       api("/bookings/me"),
       api("/notifications/me"),
     ]);
+    const waitlist = me?.role === "USER" ? await api("/waitlist/me") : [];
     const upcoming = bs.filter((b) => new Date(b.end_at) > new Date()).length;
     app.innerHTML = `<div class="d-flex justify-content-between flex-wrap"><div><h2 class="section-title">Xin chào, ${esc(me?.full_name || "")} 👋</h2><p class="muted">Tổng quan hoạt động đặt phòng của bạn</p></div><button class="btn btn-primary align-self-start" onclick="showPage('rooms')">+ Đặt phòng mới</button></div><div class="row g-3 my-2"><div class="col-md-4"><div class="stat"><span class="muted">Tổng booking</span><strong>${bs.length}</strong></div></div><div class="col-md-4"><div class="stat"><span class="muted">Lịch sắp tới</span><strong>${upcoming}</strong></div></div><div class="col-md-4"><div class="stat"><span class="muted">Thông báo</span><strong>${ns.filter((n) => !n.read).length}</strong></div></div></div><div class="panel mt-3"><div class="d-flex justify-content-between"><h5>Booking gần đây</h5><a href="#" onclick="showPage('calendar')">Xem lịch</a></div>${bookingTable(bs)}</div><div class="panel mt-3"><h5>Thông báo mới</h5>${
       ns
@@ -251,9 +270,23 @@ async function dashboardPage() {
             `<div class="border-bottom py-2"><b>${esc(n.title)}</b><div class="muted small">${esc(n.body)}</div></div>`,
         )
         .join("") || '<p class="muted">Chưa có thông báo.</p>'
-    }</div><div class="mt-3"><button class="btn btn-outline-primary" onclick="showPage('ai')">Mở AI Assistant</button></div>`;
+    }</div>${me?.role === "USER" ? `<div class="panel mt-3"><div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Danh sách chờ (Waitlist)</h5><span class="badge text-bg-primary">${waitlist.filter(x=>x.status==="WAITING").length} đang chờ</span></div>${waitlist.length ? `<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Phòng</th><th>Thời gian</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${waitlist.map(w=>`<tr><td>${esc(w.room_code)}</td><td>${new Date(w.start_at).toLocaleString("vi-VN")} – ${new Date(w.end_at).toLocaleString("vi-VN")}</td><td><span class="badge ${w.status==="NOTIFIED"?"text-bg-success":"text-bg-secondary"}">${esc(w.status)}</span></td><td>${["WAITING","NOTIFIED"].includes(w.status)?`<button class="btn btn-sm btn-outline-danger" onclick="leaveWaitlist(${w.id})">Rời danh sách</button>`:""} ${w.status==="NOTIFIED"?`<button class="btn btn-sm btn-primary" onclick="openWaitlistBooking(${w.room_id},'${esc(w.room_code)}',${JSON.stringify(w.start_at)},${JSON.stringify(w.end_at)})">Đặt phòng</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:"<p class='muted mb-0'>Chưa tham gia danh sách chờ.</p>"}</div>` : ""}<div class="mt-3"><button class="btn btn-outline-primary" onclick="showPage('ai')">Mở AI Assistant</button></div>`;
   } catch (e) {
     alertMsg(e.message, "danger");
+  }
+}
+async function leaveWaitlist(id) {
+  if (!(await uniroomConfirm("Rời danh sách chờ","Bạn muốn hủy yêu cầu chờ này?","Rời danh sách"))) return;
+  try { await api(`/waitlist/${id}`,{method:"DELETE"}); alertMsg("Đã rời danh sách chờ"); dashboardPage(); }
+  catch(e) { alertMsg(e.message,"danger"); }
+}
+async function openWaitlistBooking(roomId, code, start, end) {
+  const room = await api(`/rooms/${roomId}`);
+  bookingForm(roomId, code, room.capacity);
+  const form = document.getElementById("booking-form");
+  if (form) {
+    form.elements.start_at.value = start.slice(0,16);
+    form.elements.end_at.value = end.slice(0,16);
   }
 }
 function bookingTable(bs) {
@@ -481,7 +514,7 @@ async function managerPage() {
         `<div class="col-6 col-xl-3"><div class="stat h-100"><span class="muted"><i class="bi ${x[2]} me-1"></i>${x[0]}</span><strong>${x[1]}</strong></div></div>`,
     )
     .join("")}</div>
-  <div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary" onclick="managerTab('requests')">Yêu cầu đặt phòng (${bookings.length})</button><button class="btn btn-outline-primary" onclick="managerTab('rooms')">Danh sách phòng</button><button class="btn btn-outline-primary" onclick="managerTab('maintenance')">Bảo trì & sự cố</button><button class="btn btn-outline-primary" onclick="managerTab('equipment')">Thiết bị</button><button class="btn btn-outline-primary" onclick="managerTab('schedule')">Lịch sử dụng</button></div><div id="manager-content"></div>`;
+  <div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-primary" onclick="managerTab('requests')">Yêu cầu đặt phòng (${bookings.length})</button><button class="btn btn-outline-primary" onclick="managerTab('rooms')">Danh sách phòng</button><button class="btn btn-outline-primary" onclick="managerTab('maintenance')">Bảo trì & sự cố</button><button class="btn btn-outline-primary" onclick="managerTab('equipment')">Thiết bị</button><button class="btn btn-outline-primary" onclick="managerTab('schedule')">Lịch sử dụng</button><button class="btn btn-outline-primary" onclick="managerTab('waitlist')">Danh sách chờ</button></div><div id="manager-content"></div>`;
     window.managerData = {
       sum,
       rooms,
@@ -499,6 +532,15 @@ function managerTab(tab) {
   const d = window.managerData || {},
     el = document.getElementById("manager-content");
   if (!el) return;
+  if (tab === "waitlist") {
+    el.innerHTML = '<div class="panel"><h5>Danh sách chờ theo phòng phụ trách</h5><div id="manager-waitlist-data">Đang tải...</div></div>';
+    api("/manager/waitlist").then(rows => {
+      const target = document.getElementById("manager-waitlist-data");
+      if (!target) return;
+      target.innerHTML = rows.length ? `<div class="table-responsive"><table class="table"><thead><tr><th>Người chờ</th><th>Phòng</th><th>Khung giờ</th><th>Trạng thái</th></tr></thead><tbody>${rows.map(w=>`<tr><td>${esc(w.user)}</td><td>${esc(w.room_code)}</td><td>${new Date(w.start_at).toLocaleString("vi-VN")} – ${new Date(w.end_at).toLocaleString("vi-VN")}</td><td>${esc(w.status)}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">Chưa có người đăng ký chờ.</p>';
+    }).catch(e=>alertMsg(e.message,"danger"));
+    return;
+  }
   if (tab === "requests") {
     el.innerHTML = `<div class="panel"><div class="d-flex justify-content-between align-items-center mb-3"><div class="d-flex align-items-center gap-2"><h5 class="mb-0">Yêu cầu đang chờ xử lý</h5><span class="badge text-bg-primary">${me.role === "ADMIN" ? "Admin" : "Manager"}</span></div><button class="btn btn-sm btn-outline-primary" onclick="managerPage()">Làm mới</button></div>${d.bookings?.length ? `<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Người đặt</th><th>Phòng</th><th>Nội dung</th><th>Thời gian</th><th>Thao tác</th></tr></thead><tbody>${d.bookings.map((b) => `<tr><td>${esc(b.user)}</td><td><b>${esc(b.room_code)}</b></td><td>${esc(b.title)}<div class="small muted">${esc(b.purpose || "")}</div></td><td>${new Date(b.start_at).toLocaleString("vi-VN")}<br>${new Date(b.end_at).toLocaleString("vi-VN")}</td><td class="text-nowrap"><button class="btn btn-sm btn-success" onclick="decision(${b.id},'APPROVED')">Duyệt</button> <button class="btn btn-sm btn-outline-danger" onclick="decision(${b.id},'REJECTED')">Từ chối</button></td></tr>`).join("")}</tbody></table></div>` : '<p class="muted mb-0">Không có yêu cầu chờ duyệt.</p>'}</div>`;
   }

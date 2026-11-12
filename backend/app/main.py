@@ -198,6 +198,12 @@ def create_booking(data:schemas.BookingIn, user=Depends(require_roles("USER","RO
     b=models.Booking(user_id=user.id,room_id=room.id,title=data.title,purpose=data.purpose,attendee_count=data.attendee_count,
         start_at=data.start_at,end_at=data.end_at,status="APPROVED" if auto_approve else "PENDING")
     db.add(b); db.flush()
+    for entry in db.query(models.WaitlistEntry).filter(
+        models.WaitlistEntry.user_id == user.id, models.WaitlistEntry.room_id == room.id,
+        models.WaitlistEntry.status.in_(["WAITING", "NOTIFIED"]),
+        models.WaitlistEntry.start_at < data.end_at,
+        models.WaitlistEntry.end_at > data.start_at).all():
+        entry.status = "FULFILLED"
     notify(db,user.id,"Đã nhận yêu cầu đặt phòng",f"Yêu cầu {b.title} đã được xác nhận." if auto_approve else f"Yêu cầu {b.title} đang chờ quản lý duyệt.")
     db.commit(); db.refresh(b)
     return {"success":True,"data":{"id":b.id,"status":b.status},"message":"Đặt phòng thành công, đang chờ duyệt"}
@@ -251,7 +257,9 @@ def cancel_booking(booking_id:int,user=Depends(current_user),db:Session=Depends(
         hours=(b.start_at-datetime.now()).total_seconds()/3600
         if hours < int(cancel_rule.value):
             raise HTTPException(400,f"Chỉ được tự huỷ trước giờ bắt đầu ít nhất {cancel_rule.value} giờ")
-    b.status="CANCELLED"; db.commit()
+    b.status="CANCELLED"
+    notify_waitlist_available(db, b.room_id)
+    db.commit()
     return {"success":True,"message":"Đã huỷ booking"}
 
 @app.get("/api/calendar/me")
@@ -311,17 +319,97 @@ def read_notification(notification_id:int,user=Depends(current_user),db:Session=
     n.read_at=datetime.utcnow();db.commit()
     return {"success":True,"message":"Đã đánh dấu đã đọc"}
 
+# Waitlist does not reserve the room. FIFO notification, with availability rechecked on booking.
+def waitlist_payload(entry, db):
+    room = db.query(models.Room).filter_by(id=entry.room_id).first()
+    return {"id": entry.id, "room_id": entry.room_id, "room_code": room.code if room else "?",
+            "user_id": entry.user_id, "start_at": entry.start_at.isoformat(),
+            "end_at": entry.end_at.isoformat(), "status": entry.status,
+            "created_at": entry.created_at.isoformat()}
+
+def notify_waitlist_available(db, room_id):
+    now = datetime.utcnow()
+    waiting = db.query(models.WaitlistEntry).filter_by(room_id=room_id, status="WAITING").order_by(
+        models.WaitlistEntry.created_at, models.WaitlistEntry.id).all()
+    for entry in waiting:
+        if entry.start_at <= now:
+            entry.status = "EXPIRED"
+            continue
+        overlap = db.query(models.Booking.id).filter(
+            models.Booking.room_id == room_id,
+            models.Booking.status.in_(["PENDING", "APPROVED", "CHECKED_IN"]),
+            models.Booking.start_at < entry.end_at,
+            models.Booking.end_at > entry.start_at).first()
+        maintenance = db.query(models.Maintenance.id).filter(
+            models.Maintenance.room_id == room_id, models.Maintenance.status == "ACTIVE",
+            models.Maintenance.start_at < entry.end_at,
+            models.Maintenance.end_at > entry.start_at).first()
+        if not overlap and not maintenance:
+            entry.status = "NOTIFIED"
+            room = db.query(models.Room).filter_by(id=room_id).first()
+            notify(db, entry.user_id, "Waitlist: phòng đã có thể đặt",
+                   f"Phòng {room.code if room else room_id} có khung giờ trống từ "
+                   f"{entry.start_at:%d/%m/%Y %H:%M} đến {entry.end_at:%H:%M}. "
+                   "Vào Theo dõi đặt phòng để đặt lại. Không tự động giữ chỗ.", "WAITLIST")
+            # FIFO: notify one person per freed interval, not every competing waiter.
+            break
+
 @app.post("/api/waitlist")
-def join_waitlist(data:schemas.BookingIn,user=Depends(current_user),db:Session=Depends(get_db)):
-    if data.start_at>=data.end_at: raise HTTPException(400,"Khoảng thời gian không hợp lệ")
-    entry=models.WaitlistEntry(user_id=user.id,room_id=data.room_id,start_at=data.start_at,end_at=data.end_at)
-    db.add(entry);db.commit();db.refresh(entry)
-    return {"success":True,"data":{"id":entry.id,"status":entry.status},"message":"Đã tham gia danh sách chờ"}
+def join_waitlist(data: schemas.BookingIn, user=Depends(require_roles("USER")), db: Session=Depends(get_db)):
+    now = datetime.utcnow()
+    if data.start_at >= data.end_at or data.start_at <= now:
+        raise HTTPException(400, "Khoảng thời gian chờ không hợp lệ hoặc đã qua")
+    room = db.query(models.Room).filter_by(id=data.room_id).first()
+    if not room: raise HTTPException(404, "Không tìm thấy phòng")
+    maintenance = db.query(models.Maintenance.id).filter(
+        models.Maintenance.room_id == data.room_id, models.Maintenance.status == "ACTIVE",
+        models.Maintenance.start_at < data.end_at, models.Maintenance.end_at > data.start_at).first()
+    if maintenance: raise HTTPException(409, "Phòng có lịch bảo trì; không thể đăng ký chờ khoảng thời gian này")
+    conflict = db.query(models.Booking.id).filter(
+        models.Booking.room_id == data.room_id,
+        models.Booking.status.in_(["PENDING", "APPROVED", "CHECKED_IN"]),
+        models.Booking.start_at < data.end_at, models.Booking.end_at > data.start_at).first()
+    if not conflict: raise HTTPException(400, "Phòng hiện chưa bị trùng lịch; vui lòng đặt phòng trực tiếp")
+    duplicate = db.query(models.WaitlistEntry.id).filter(
+        models.WaitlistEntry.user_id == user.id, models.WaitlistEntry.room_id == data.room_id,
+        models.WaitlistEntry.start_at == data.start_at, models.WaitlistEntry.end_at == data.end_at,
+        models.WaitlistEntry.status.in_(["WAITING", "NOTIFIED"])).first()
+    if duplicate: raise HTTPException(409, "Bạn đã đăng ký chờ khung giờ này")
+    entry = models.WaitlistEntry(user_id=user.id, room_id=data.room_id,
+                                 start_at=data.start_at, end_at=data.end_at, status="WAITING")
+    db.add(entry); db.commit(); db.refresh(entry)
+    return {"success": True, "data": waitlist_payload(entry, db), "message": "Đã tham gia danh sách chờ"}
 
 @app.get("/api/waitlist/me")
-def my_waitlist(user=Depends(current_user),db:Session=Depends(get_db)):
-    rows=db.query(models.WaitlistEntry).filter_by(user_id=user.id).order_by(models.WaitlistEntry.created_at.desc()).all()
-    return {"success":True,"data":[{"id":x.id,"room_id":x.room_id,"start_at":x.start_at.isoformat(),"end_at":x.end_at.isoformat(),"status":x.status} for x in rows]}
+def my_waitlist(user=Depends(current_user), db: Session=Depends(get_db)):
+    rows = db.query(models.WaitlistEntry).filter_by(user_id=user.id).order_by(
+        models.WaitlistEntry.created_at.desc()).all()
+    return {"success": True, "data": [waitlist_payload(x, db) for x in rows]}
+
+@app.delete("/api/waitlist/{entry_id}")
+def leave_waitlist(entry_id: int, user=Depends(current_user), db: Session=Depends(get_db)):
+    entry = db.query(models.WaitlistEntry).filter_by(id=entry_id, user_id=user.id).first()
+    if not entry: raise HTTPException(404, "Không tìm thấy yêu cầu chờ")
+    if entry.status not in ("WAITING", "NOTIFIED"):
+        raise HTTPException(400, "Yêu cầu chờ này không còn hiệu lực")
+    entry.status = "CANCELLED"
+    db.commit()
+    return {"success": True, "message": "Đã rời danh sách chờ"}
+
+@app.get("/api/manager/waitlist")
+def manager_waitlist(user=Depends(require_roles("ROOM_MANAGER", "ADMIN")), db: Session=Depends(get_db)):
+    query = db.query(models.WaitlistEntry)
+    if user.role.name == "ROOM_MANAGER":
+        ids = [x.room_id for x in db.query(models.RoomManagerAssignment).filter_by(manager_id=user.id).all()]
+        query = query.filter(models.WaitlistEntry.room_id.in_(ids))
+    rows = query.order_by(models.WaitlistEntry.created_at, models.WaitlistEntry.id).all()
+    result = []
+    for entry in rows:
+        item = waitlist_payload(entry, db)
+        person = db.query(models.User).filter_by(id=entry.user_id).first()
+        item["user"] = person.full_name if person else "?"
+        result.append(item)
+    return {"success": True, "data": result}
 
 @app.post("/api/bookings/{booking_id}/check-in")
 def check_in(booking_id:int,user=Depends(current_user),db:Session=Depends(get_db)):
@@ -426,6 +514,7 @@ def decide_booking(booking_id:int,payload:dict,user=Depends(require_roles("ROOM_
             models.Booking.status.in_(["APPROVED","CHECKED_IN"]),models.Booking.start_at<b.end_at,models.Booking.end_at>b.start_at).first()
         if conflict:raise HTTPException(409,"Lịch đã phát sinh xung đột, không thể duyệt")
     b.status=decision
+    if decision == "REJECTED": notify_waitlist_available(db, b.room_id)
     db.add(models.BookingApproval(booking_id=b.id,reviewer_id=user.id,decision=decision,note=payload.get("note","")))
     notify(db,b.user_id,"Booking đã được cập nhật",f"{b.room.code}: {decision}. {payload.get('note','')}")
     db.commit()
@@ -645,6 +734,7 @@ def close_maintenance(maintenance_id:int, user=Depends(require_roles("ROOM_MANAG
     if not active:
         room=db.query(models.Room).filter_by(id=item.room_id).first()
         if room and room.status=="MAINTENANCE": room.status="ACTIVE"
+    notify_waitlist_available(db, item.room_id)
     db.commit(); return {"success":True,"message":"Đã hoàn tất bảo trì"}
 
 @app.get("/api/admin/room-managers")
