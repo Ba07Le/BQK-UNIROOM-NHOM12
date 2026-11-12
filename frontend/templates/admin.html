@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Admin · UniRoom{% endblock %}{% block
+content %}
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="side-label">ADMIN</div>
+    <a class="active" href="/admin">▦ Dashboard</a
+    ><a href="/dashboard">⌂ Lobby</a>
+  </aside>
+  <section class="workspace">
+    <span class="eyebrow">Quản trị hệ thống</span>
+    <h1>Admin <em>Console.</em></h1>
+    <p>Quản trị người dùng và theo dõi hệ thống (demo).</p>
+    <div class="stats" id="dashStats"></div>
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Quản lý người dùng</h3>
+        <button class="btn small" onclick="loadAdminUsers()">↻ Làm mới</button>
+      </div>
+      <div id="adminUsers">Đang tải...</div>
+    </div>
+    <div class="panel">
+      <h3>Rules Engine hiện hành</h3>
+      <div id="rulesList">Đang tải...</div>
+    </div>
+  </section>
+</div>
+{% endblock %}

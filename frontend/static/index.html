@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UniRoom – Đặt phòng học & Lab</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+    />
+    <link href="/static/css/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <nav id="main-navbar" class="navbar navbar-expand-lg navbar-dark nav-main">
+      <div class="container">
+        <a
+          class="navbar-brand fw-bold d-flex align-items-center gap-2"
+          href="#"
+          onclick="showPage('home')"
+          ><span class="brand-mark"><i class="bi bi-buildings-fill"></i></span
+          ><span>UniRoom</span></a
+        >
+        <button
+          class="navbar-toggler"
+          data-bs-toggle="collapse"
+          data-bs-target="#nav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="nav">
+          <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="showPage('home')"
+                >Trang chủ</a
+              >
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="showPage('rooms')"
+                >Khám phá phòng</a
+              >
+            </li>
+            <li class="nav-item d-none" id="nav-dashboard" hidden>
+              <a class="nav-link" href="#" onclick="showPage('dashboard')"
+                >Bảng điều khiển</a
+              >
+            </li>
+            <li class="nav-item d-none" id="nav-calendar" hidden>
+              <a class="nav-link" href="#" onclick="showPage('calendar')"
+                >Lịch cá nhân</a
+              >
+            </li>
+            <li class="nav-item d-none" id="nav-ai" hidden>
+              <a
+                class="nav-link d-flex align-items-center gap-1"
+                href="#"
+                onclick="showPage('ai')"
+                ><span class="ai-nav-mark"><i class="bi bi-stars"></i></span>
+                UniRoom AI Assistant</a
+              >
+            </li>
+            <li class="nav-item d-none" id="nav-manager" hidden>
+              <a class="nav-link" href="#" onclick="showPage('manager')"
+                >Quản lý phòng</a
+              >
+            </li>
+            <li class="nav-item d-none" id="nav-admin" hidden>
+              <a class="nav-link" href="#" onclick="showPage('admin')"
+                >Quản trị hệ thống</a
+              >
+            </li>
+            <li class="nav-item d-none" id="nav-notifications" hidden>
+              <a class="nav-link" href="#" onclick="showPage('notifications'); return false;"><i class="bi bi-bell me-1"></i>Thông báo mới</a>
+            </li>
+            <li class="nav-item d-none" id="nav-user" hidden>
+              <a class="nav-link" href="#" onclick="showPage('profile')"
+                >Tài khoản</a
+              >
+            </li>
+            <li class="nav-item" id="nav-auth">
+              <a class="nav-link" href="#" onclick="showPage('login')"
+                >Đăng nhập</a
+              >
+            </li>
+            <li class="nav-item" id="nav-register">
+              <a
+                class="btn btn-light btn-sm nav-cta"
+                href="#"
+                onclick="showPage('register')"
+                >Tạo tài khoản <i class="bi bi-arrow-up-right ms-1"></i
+              ></a>
+            </li>
+            <li class="nav-item d-none" id="nav-logout" hidden>
+              <button class="btn btn-light btn-sm" onclick="logout()">
+                Đăng xuất
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    <main id="main-content" class="container py-4">
+      <div id="alert-area"></div>
+      <section id="app"></section>
+    </main>
+    <footer id="main-footer" class="footer uniroom-footer">
+      <div class="container uniroom-footer-layout">
+        <div class="uniroom-footer-info">
+          <span class="uniroom-footer-eyebrow">ĐỒ ÁN LẬP TRÌNH PYTHON · NHÓM 12</span>
+          <h2>Học viện Hàng không Việt Nam <span>– VAU</span></h2>
+          <p class="uniroom-footer-description">UniRoom · Hệ thống đặt lịch phòng học và phòng Lab</p>
+          <div class="uniroom-footer-members">
+            <div><strong>Thành viên thực hiện</strong><span>Lê Đức Bảo · Lê Hồng Quân · Phạm Đăng Khoa</span></div>
+            <div><strong>Giáo viên hướng dẫn</strong><span>ThS. Lê Minh Hưng</span></div>
+          </div>
+          <div class="uniroom-footer-bottom">© 2026 UniRoom · Nhóm 12 · Vietnam Aviation Academy</div>
+        </div>
+        <div class="uniroom-footer-plane" aria-hidden="true">
+          <svg viewBox="0 0 440 320" xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="planeGradient" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#83b5ff"/></linearGradient></defs>
+            <circle cx="230" cy="160" r="135" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="2" stroke-dasharray="7 10"/>
+            <circle cx="230" cy="160" r="98" fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="2"/>
+            <path d="M62 232 C135 255 300 257 395 182" stroke="#8dc4ff" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="8 12"/>
+            <g transform="translate(221 150) rotate(-32) scale(8.6)" fill="url(#planeGradient)">
+              <path d="M0-16c1.2 0 2 1.3 2 3v10l13 9v3L2 5v8l5 4v2l-7-2-7 2v-2l5-4V5l-13 4V6l13-9v-10c0-1.7.8-3 2-3z"/>
+            </g>
+            <circle cx="370" cy="75" r="5" fill="#b6d7ff"/><circle cx="91" cy="111" r="3" fill="#b6d7ff"/>
+          </svg>
+          <span>FLY HIGH · LEARN SMART</span>
+        </div>
+      </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="/static/js/app.js?v=calendar-maintenance-modal-v5"></script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: uniroom-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: uniroom
+      POSTGRES_USER: uniroom
+      POSTGRES_PASSWORD: uniroom_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - uniroom_pgdata:/var/lib/postgresql/data
+volumes:
+  uniroom_pgdata:

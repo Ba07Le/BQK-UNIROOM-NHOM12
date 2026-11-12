@@ -1,0 +1,77 @@
+{% extends "base.html" %}{% block title %}Lobby · UniRoom{% endblock %}{% block
+content %}
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="side-label">WORKSPACE</div>
+    <a class="active" href="/dashboard">⌂ Tổng quan</a
+    ><a href="/rooms">▦ Tìm phòng</a><a href="/bookings">◷ Lịch của tôi</a
+    ><a href="/notifications">♧ Thông báo</a>
+    <div class="side-label">ACCOUNT</div>
+    <a href="/profile">⚙ Hồ sơ</a>{% if user.role=='admin' %}<a href="/admin"
+      >♙ Admin</a
+    >{% endif %}{% if user.role=='manager' %}<a href="/manager"
+      >▤ Quản lý phòng</a
+    >{% endif %}
+  </aside>
+  <section class="workspace">
+    <div class="welcome">
+      <div>
+        <span class="eyebrow">YOUR CAMPUS, YOUR SPACE</span>
+        <h1>Xin chào, {{user.name.split(' ')[-1]}} <span>✦</span></h1>
+        <p>Đây là không gian quản lý lịch phòng của bạn.</p>
+      </div>
+      <a class="btn" href="/rooms">＋ Đặt phòng mới</a>
+    </div>
+    <div class="stats" id="dashStats">
+      <div class="stat">
+        <span>Phòng hoạt động</span><b>—</b><small>Trong hệ thống</small>
+      </div>
+      <div class="stat">
+        <span>Tổng booking</span><b>—</b><small>Lịch của bạn</small>
+      </div>
+      <div class="stat">
+        <span>Chờ duyệt</span><b>—</b><small>Cần theo dõi</small>
+      </div>
+      <div class="stat">
+        <span>Đã xác nhận</span><b>—</b><small>Booking approved</small>
+      </div>
+    </div>
+    <div class="dash-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">UPCOMING</span>
+            <h3>Lịch đặt gần đây</h3>
+          </div>
+          <a href="/bookings">Xem tất cả →</a>
+        </div>
+        <div id="recentBookings" class="loading">Đang tải dữ liệu...</div>
+      </div>
+      <div class="panel ai-panel">
+        <span class="eyebrow">UNIROOM INTELLIGENCE</span>
+        <h3>Trợ lý AI <em>của bạn</em></h3>
+        <p>Hỏi nhanh về phòng, lịch và quy định đặt chỗ.</p>
+        <div class="chat-mini">
+          <input id="aiInput" placeholder="Ví dụ: Có phòng Lab không?" /><button
+            onclick="askAI()"
+          >
+            ↗
+          </button>
+        </div>
+        <div id="aiAnswer" class="ai-answer">AI demo sẵn sàng hỗ trợ.</div>
+        <a class="text-link" href="/rooms">Khám phá phòng ↗</a>
+      </div>
+    </div>
+    <div class="panel room-strip">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">SPACES</span>
+          <h3>Phòng nổi bật</h3>
+        </div>
+        <a href="/rooms">Tìm tất cả →</a>
+      </div>
+      <div id="roomPreview" class="room-cards">Đang tải...</div>
+    </div>
+  </section>
+</div>
+{% endblock %}
