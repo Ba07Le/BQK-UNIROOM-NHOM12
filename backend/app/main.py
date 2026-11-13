@@ -1,4 +1,4 @@
-import os, io, csv, secrets
+import os, io, csv, secrets, json
 from datetime import datetime, timedelta
 from typing import Optional
 from pathlib import Path
@@ -7,7 +7,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Header
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from .database import Base, engine, get_db
 from . import models, schemas
 from .security import create_access_token, decode_token, verify_password, hash_password
@@ -439,22 +439,95 @@ def booking_qr(booking_id:int,user=Depends(current_user),db:Session=Depends(get_
         row=models.CheckIn(booking_id=b.id,qr_token=secrets.token_urlsafe(24));db.add(row);db.commit()
     return StreamingResponse(io.BytesIO(qr_png(row.qr_token)),media_type="image/png")
 
+# AI endpoints: grounded PostgreSQL retrieval, optional OpenAI intent parsing.
+from .ai_service import SearchRequest, search_rooms, respond
+
+@app.post("/api/ai/recommend-room")
+def ai_recommend_room(payload: SearchRequest, user=Depends(current_user), db: Session=Depends(get_db)):
+    try:
+        rooms=search_rooms(db,payload)
+    except ValueError as exc:
+        raise HTTPException(400,str(exc))
+    return {"success":True,"data":{"rooms":rooms,"filters":payload.model_dump(mode="json"),"count":len(rooms)}}
+
+@app.get("/api/ai/conversations")
+def ai_conversations(user=Depends(current_user),db:Session=Depends(get_db)):
+    rows=db.query(models.AIConversation).filter_by(user_id=user.id).order_by(models.AIConversation.id.desc()).limit(30).all()
+    ids=[r.id for r in rows]
+    first_messages={}
+    if ids:
+        # Fetch only the first USER message of each conversation (no N+1 queries).
+        first_ids=(db.query(models.AIMessage.conversation_id,
+                            func.min(models.AIMessage.id).label("first_id"))
+                   .filter(models.AIMessage.conversation_id.in_(ids),
+                           models.AIMessage.role=="user")
+                   .group_by(models.AIMessage.conversation_id).subquery())
+        messages=(db.query(models.AIMessage)
+                  .join(first_ids,models.AIMessage.id==first_ids.c.first_id).all())
+        first_messages={m.conversation_id:m.content for m in messages}
+    return {"success":True,"data":[{"id":r.id,
+        "title":(lambda t: t[:20] + ("..." if len(t) > 20 else ""))(first_messages.get(r.id, "Cuộc hội thoại mới").strip() or "Cuộc hội thoại mới"),
+        "created_at":r.created_at.isoformat()} for r in rows]}
+
+# Keep the complete assistant response in the existing Text column (no DB migration).
+# Legacy plain-text messages remain readable.
+_AI_RESULT_PREFIX = "__UNIROOM_AI_RESULT_V2__:"
+
+def _ai_unpack_message(message):
+    raw = message.content or ""
+    if message.role == "assistant" and raw.startswith(_AI_RESULT_PREFIX):
+        try:
+            data = json.loads(raw[len(_AI_RESULT_PREFIX):])
+            if isinstance(data, dict) and isinstance(data.get("answer"), str):
+                return {"role": message.role, "content": data["answer"],
+                        "rooms": data.get("rooms", []), "filters": data.get("filters", {}),
+                        "missing": data.get("missing", [])}
+        except (ValueError, TypeError):
+            pass
+    return {"role": message.role, "content": raw}
+
+@app.get("/api/ai/conversations/{conversation_id}")
+def ai_conversation_detail(conversation_id:int,user=Depends(current_user),db:Session=Depends(get_db)):
+    conv=db.query(models.AIConversation).filter_by(id=conversation_id,user_id=user.id).first()
+    if not conv:raise HTTPException(404,"Không tìm thấy cuộc hội thoại")
+    rows=db.query(models.AIMessage).filter_by(conversation_id=conv.id).order_by(models.AIMessage.id).limit(100).all()
+    return {"success":True,"data":{"conversation_id":conv.id,"messages":[_ai_unpack_message(r) for r in rows]}}
+
+@app.delete("/api/ai/conversations/{conversation_id}")
+def ai_delete_conversation(conversation_id:int,user=Depends(current_user),db:Session=Depends(get_db)):
+    conv=db.query(models.AIConversation).filter_by(id=conversation_id,user_id=user.id).first()
+    if not conv:raise HTTPException(404,"Không tìm thấy cuộc hội thoại")
+    # Hard delete: remove every message and the parent conversation in one transaction.
+    # Do not retain a soft-deleted row or merely hide it from the interface.
+    db.query(models.AIMessage).filter_by(conversation_id=conv.id).delete(synchronize_session=False)
+    db.delete(conv)
+    db.commit()
+    return {"success":True,"message":"Đã xóa vĩnh viễn hội thoại và toàn bộ tin nhắn", "data":{"deleted_id":conversation_id}}
+
 @app.post("/api/ai/chat")
 def ai_chat(payload:dict,user=Depends(current_user),db:Session=Depends(get_db)):
     question=str(payload.get("message","")).strip()
-    if not question: raise HTTPException(400,"Vui lòng nhập nội dung")
-    conv=models.AIConversation(user_id=user.id);db.add(conv);db.flush()
-    db.add(models.AIMessage(conversation_id=conv.id,role="user",content=question))
-    # Safe local fallback: assistant uses actual room catalogue; no external API key required.
-    rooms=db.query(models.Room).filter_by(status="ACTIVE").all()
-    answer="Mình có thể hỗ trợ bạn tìm phòng, đặt lịch và giải thích quy trình. "
-    if "lab" in question.lower():
-        labs=[r for r in rooms if "lab" in r.name.lower() or "lab" in r.code.lower()]
-        answer += "Các phòng Lab hiện có: " + (", ".join(r.code for r in labs) if labs else "chưa có dữ liệu") + "."
+    if not question or len(question)>1200:raise HTTPException(400,"Nội dung phải có từ 1 đến 1200 ký tự")
+    conv_id=payload.get("conversation_id")
+    if conv_id is not None:
+        try:conv_id=int(conv_id)
+        except (TypeError,ValueError):raise HTTPException(400,"conversation_id không hợp lệ")
+        conv=db.query(models.AIConversation).filter_by(id=conv_id,user_id=user.id).first()
+        if not conv:raise HTTPException(404,"Không tìm thấy cuộc hội thoại")
     else:
-        answer += "Bạn hãy cho biết ngày, giờ, số người và thiết bị cần dùng để mình gợi ý chính xác hơn."
-    db.add(models.AIMessage(conversation_id=conv.id,role="assistant",content=answer));db.commit()
-    return {"success":True,"data":{"conversation_id":conv.id,"answer":answer,"mode":"local-fallback"}}
+        conv=models.AIConversation(user_id=user.id);db.add(conv);db.flush()
+    history=[_ai_unpack_message(m) for m in db.query(models.AIMessage).filter_by(conversation_id=conv.id).order_by(models.AIMessage.id.desc()).limit(6).all()][::-1]
+    # Server-side persisted context is authoritative, not browser-provided filters.
+    previous=next((m.get("filters") for m in reversed(history) if m.get("role")=="assistant" and isinstance(m.get("filters"),dict)), None)
+    if previous is not None and (not isinstance(previous,dict) or len(str(previous))>3000):raise HTTPException(400,"Bộ lọc không hợp lệ")
+    try:result=respond(db,question,history,previous)
+    except ValueError as exc:raise HTTPException(400,str(exc))
+    db.add(models.AIMessage(conversation_id=conv.id,role="user",content=question))
+    stored={"answer":result["answer"], "rooms":result.get("rooms",[]),
+            "filters":result.get("filters",{}), "missing":result.get("missing",[])}
+    db.add(models.AIMessage(conversation_id=conv.id,role="assistant",content=_AI_RESULT_PREFIX+json.dumps(stored,ensure_ascii=False,default=str)))
+    db.commit()
+    return {"success":True,"data":{"conversation_id":conv.id,**result}}
 
 @app.get("/api/calendar/export.csv")
 def export_csv(user=Depends(current_user),db:Session=Depends(get_db)):
@@ -527,6 +600,37 @@ def create_room(data:schemas.RoomCreate,user=Depends(require_roles("ROOM_MANAGER
     if user.role.name == "ROOM_MANAGER": db.add(models.RoomManagerAssignment(manager_id=user.id, room_id=r.id))
     db.commit();db.refresh(r)
     return {"success":True,"data":{"id":r.id},"message":"Đã tạo phòng"}
+
+@app.patch("/api/manager/rooms/{room_id}")
+def manager_update_room(room_id: int, data: schemas.RoomUpdate,
+                        user=Depends(require_roles("ROOM_MANAGER", "ADMIN")),
+                        db: Session = Depends(get_db)):
+    room = db.query(models.Room).filter_by(id=room_id).first()
+    if not room:
+        raise HTTPException(404, "Không tìm thấy phòng")
+    if user.role.name == "ROOM_MANAGER" and not db.query(models.RoomManagerAssignment).filter_by(
+        manager_id=user.id, room_id=room_id
+    ).first():
+        raise HTTPException(403, "Bạn không có quyền sửa phòng này")
+    code = data.code.strip()
+    name = data.name.strip()
+    if not code or not name:
+        raise HTTPException(400, "Mã phòng và tên phòng không được để trống")
+    if data.status not in ("ACTIVE", "INACTIVE", "MAINTENANCE"):
+        raise HTTPException(400, "Trạng thái phòng không hợp lệ")
+    if db.query(models.Room).filter(models.Room.code == code, models.Room.id != room_id).first():
+        raise HTTPException(409, "Mã phòng đã tồn tại")
+    if not db.query(models.Building).filter_by(id=data.building_id).first():
+        raise HTTPException(400, "Tòa nhà không tồn tại")
+    if not db.query(models.RoomType).filter_by(id=data.room_type_id).first():
+        raise HTTPException(400, "Loại phòng không tồn tại")
+    for field, value in data.model_dump().items():
+        setattr(room, field, value)
+    room.code = code
+    room.name = name
+    db.commit()
+    db.refresh(room)
+    return {"success": True, "data": room_dict(room), "message": "Đã cập nhật thông tin phòng"}
 
 @app.get("/api/admin/summary")
 def admin_summary(user=Depends(require_roles("ADMIN")),db:Session=Depends(get_db)):
