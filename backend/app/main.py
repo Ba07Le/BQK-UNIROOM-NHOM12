@@ -481,7 +481,7 @@ def _ai_unpack_message(message):
             if isinstance(data, dict) and isinstance(data.get("answer"), str):
                 return {"role": message.role, "content": data["answer"],
                         "rooms": data.get("rooms", []), "filters": data.get("filters", {}),
-                        "missing": data.get("missing", [])}
+                        "missing": data.get("missing", []), "mode": data.get("mode", "unknown")}
         except (ValueError, TypeError):
             pass
     return {"role": message.role, "content": raw}
@@ -524,10 +524,12 @@ def ai_chat(payload:dict,user=Depends(current_user),db:Session=Depends(get_db)):
     except ValueError as exc:raise HTTPException(400,str(exc))
     db.add(models.AIMessage(conversation_id=conv.id,role="user",content=question))
     stored={"answer":result["answer"], "rooms":result.get("rooms",[]),
-            "filters":result.get("filters",{}), "missing":result.get("missing",[])}
+            "filters":result.get("filters",{}), "missing":result.get("missing",[]),
+            "mode":result.get("mode", "unknown")}
     db.add(models.AIMessage(conversation_id=conv.id,role="assistant",content=_AI_RESULT_PREFIX+json.dumps(stored,ensure_ascii=False,default=str)))
     db.commit()
-    return {"success":True,"data":{"conversation_id":conv.id,**result}}
+    return {"success":True,"data":{"conversation_id":conv.id,**result,
+        "ai_provider":"openai" if result.get("mode")=="openai+local" else "local"}}
 
 @app.get("/api/calendar/export.csv")
 def export_csv(user=Depends(current_user),db:Session=Depends(get_db)):

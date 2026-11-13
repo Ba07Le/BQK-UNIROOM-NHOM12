@@ -1,5 +1,7 @@
 """Grounded room assistant. Database is authoritative; OpenAI only parses/phrases."""
 import json
+import logging
+import httpx
 import os
 import re
 import unicodedata
@@ -9,6 +11,8 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import joinedload
 from sqlalchemy import or_
 from . import models
+
+logger = logging.getLogger(__name__)
 
 BLOCKING = ('PENDING', 'APPROVED', 'CHECKED_IN')
 
@@ -93,10 +97,32 @@ def search_rooms(db, req: SearchRequest):
     return results[:req.limit]
 
 
-def _client():
-    if not os.getenv('OPENAI_API_KEY','').strip():return None
-    from openai import OpenAI
-    return OpenAI(api_key=os.environ['OPENAI_API_KEY'],timeout=15.0,max_retries=1)
+def _openai_chat_json(system: str, message: str) -> dict:
+    """Call OpenAI Chat Completions over HTTP; no OpenAI SDK or jiter."""
+    api_key = os.getenv('OPENAI_API_KEY', '').strip()
+    if not api_key:
+        raise RuntimeError('OPENAI_API_KEY is missing')
+    with httpx.Client(timeout=20.0) as client:
+        response = client.post(
+            'https://api.openai.com/v1/chat/completions',
+            headers={'Authorization': f'Bearer {api_key}'},
+            json={
+                'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                'temperature': 0,
+                'response_format': {'type': 'json_object'},
+                'messages': [
+                    {'role': 'system', 'content': system},
+                    {'role': 'user', 'content': message[:1200]},
+                ],
+                'max_tokens': 280,
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+    content = payload['choices'][0]['message']['content']
+    if not isinstance(content, str):
+        raise ValueError('OpenAI returned no JSON content')
+    return json.loads(content)
 
 
 def _normalized(value):
@@ -231,8 +257,9 @@ def parse_intent(message,history=None,previous=None):
     """
     intent,local,mode=_local_extract(message,previous)
     if intent in ('reset','policy'):return intent,local,mode
-    client=_client()
-    if not client:return intent,local,mode
+    if not os.getenv('OPENAI_API_KEY', '').strip():
+        logger.warning('UniRoom AI: OPENAI_API_KEY missing; using local parser')
+        return intent,local,'local_no_api_key'
     try:
         system=(
             'Phân tích yêu cầu phòng UniRoom. Chỉ JSON gồm intent(search|policy|other), '
@@ -242,17 +269,18 @@ def parse_intent(message,history=None,previous=None):
             'Nếu chỉ bổ sung thời gian thì giữ nguyên các bộ lọc cũ. '
             'Hôm nay tại Việt Nam: '+datetime.now().isoformat(timespec='minutes')
         )
-        resp=client.chat.completions.create(model=os.getenv('OPENAI_MODEL','gpt-4o-mini'),temperature=0,
-            response_format={'type':'json_object'},messages=[{'role':'system','content':system},
-            {'role':'user','content':message[:1200]}],max_tokens=280)
-        obj=json.loads(resp.choices[0].message.content)
+        obj=_openai_chat_json(system,message)
         # Only use LLM for optional title/purpose; deterministic matching handles
         # availability-critical fields to prevent stale/hallucinated dates.
         for key in ('title','purpose'):
             if isinstance(obj.get(key),str) and obj[key].strip():setattr(local,key,obj[key].strip())
         return intent,local,'openai+local'
-    except Exception:
-        return intent,local,'local'
+    except httpx.HTTPStatusError as exc:
+        logger.warning('UniRoom AI HTTP status %s; using local parser', exc.response.status_code)
+        return intent,local,'local_api_error'
+    except (httpx.RequestError, ValueError, KeyError, IndexError, TypeError) as exc:
+        logger.warning('UniRoom AI request/response failed (%s); using local parser', type(exc).__name__)
+        return intent,local,'local_api_error'
 
 POLICY=('UniRoom: chọn phòng và thời gian → gửi yêu cầu → chờ duyệt nếu cần → theo dõi trạng thái. '
         'Lịch đã đặt hoặc bảo trì có thể chặn yêu cầu. AI không tự đặt, hủy hay duyệt booking.')
