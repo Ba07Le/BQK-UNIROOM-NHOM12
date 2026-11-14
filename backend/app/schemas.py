@@ -42,15 +42,5 @@ class RoomCreate(BaseModel):
     description: str = ""
     status: str = "ACTIVE"
 
-class RoomUpdate(BaseModel):
-    building_id: int = Field(ge=1)
-    room_type_id: int = Field(ge=1)
-    code: str = Field(min_length=1, max_length=30)
-    name: str = Field(min_length=1, max_length=120)
-    capacity: int = Field(ge=1)
-    floor: int = Field(ge=0)
-    description: str = ""
-    status: str = "ACTIVE"
-
 class DecisionIn(BaseModel):
     note: str = ""
