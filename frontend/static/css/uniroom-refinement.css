@@ -1,0 +1,47 @@
+/* UniRoom 2026 — editorial refinement; visual layer only. */
+:root{--ink:#1c2b3e;--ink-2:#34455c;--muted:#657487;--brand:#245c83;--brand-dark:#174665;--brand-soft:#eaf3f6;--line:#dfe7eb;--canvas:#f6f7f6;--shadow:0 12px 32px rgba(24,43,57,.065)}
+body{background:#f6f7f6;color:var(--ink);-webkit-font-smoothing:antialiased}
+.nav-main{background:rgba(20,40,56,.97);box-shadow:0 4px 24px rgba(19,37,51,.12);border-bottom:1px solid rgba(255,255,255,.08)}
+.nav-main .nav-link{transition:color .22s ease,background .22s ease,transform .22s ease;border-radius:8px}
+.nav-main .nav-link:hover{background:rgba(255,255,255,.075);transform:translateY(-1px)}
+.brand-mark{background:#427c96;box-shadow:none;border-radius:9px}
+.nav-cta,.btn,.form-control,.form-select{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background-color .2s ease}
+.btn-primary,.btn-hero-primary{background:#245c83!important;border-color:#245c83!important;box-shadow:none!important}
+.btn-primary:hover,.btn-hero-primary:hover{background:#174665!important;border-color:#174665!important;transform:translateY(-2px);box-shadow:0 9px 19px rgba(28,76,108,.18)!important}
+.btn:active{transform:translateY(0) scale(.985)}
+.btn:focus-visible,a:focus-visible,.form-control:focus-visible,.form-select:focus-visible{outline:3px solid rgba(50,124,160,.25);outline-offset:2px}
+.form-control,.form-select{border-radius:10px;border-color:#dbe3e7;background-color:#fff}
+.form-control:focus,.form-select:focus{border-color:#6f9eb2;box-shadow:0 0 0 4px rgba(52,125,156,.1)}
+.panel,.room-card,.feature-card,.space-card,.card{border:1px solid #e2e8e9;box-shadow:0 6px 25px rgba(28,49,61,.045);transition:box-shadow .28s ease,transform .28s ease,border-color .28s ease}
+.panel:hover,.room-card:hover,.feature-card:hover,.space-card:hover{border-color:#d2e0e4;box-shadow:0 14px 32px rgba(28,49,61,.085)}
+.room-card:hover,.feature-card:hover,.space-card:hover{transform:translateY(-4px)}
+.home-hero{position:relative;isolation:isolate;overflow:hidden}
+.home-hero:after{content:"";position:absolute;inset:auto -10% -55% 48%;height:85%;border-radius:50%;border:1px solid rgba(255,255,255,.11);pointer-events:none;z-index:-1}
+.hero-title{letter-spacing:-.035em;line-height:1.14}
+.hero-orb{animation:uniroomDrift 13s ease-in-out infinite alternate;will-change:transform}
+.hero-orb-two{animation-delay:-6s}
+.page-heading,.rm-heading{letter-spacing:-.012em}
+.section-title,h1,h2,h3{letter-spacing:-.025em}
+.table{--bs-table-bg:transparent}
+.table thead th{font-size:.76rem;letter-spacing:.035em;text-transform:uppercase;color:#607186;border-bottom:1px solid #dfe7ea}
+.table tbody tr{transition:background-color .2s ease}
+.table tbody tr:hover{background-color:rgba(40,95,122,.035)}
+.badge{font-weight:600;letter-spacing:.01em}
+.modal-content{border:1px solid #e4ebed;border-radius:17px;box-shadow:0 25px 65px rgba(22,41,57,.17)}
+.modal.show .modal-dialog{animation:uniroomModal .26s cubic-bezier(.2,.8,.2,1) both}
+#chat{scroll-behavior:smooth}
+#main-content{min-height:55vh}
+.uniroom-footer{border-top:1px solid rgba(255,255,255,.08)}
+/* Dynamic pages: animate only newly rendered blocks; never hide data awaiting JS. */
+.ur-enter{animation:uniroomEnter .5s cubic-bezier(.2,.72,.2,1) both}
+.ur-enter.ur-delay-1{animation-delay:55ms}
+.ur-enter.ur-delay-2{animation-delay:110ms}
+.ur-enter.ur-delay-3{animation-delay:165ms}
+.ur-enter.ur-delay-4{animation-delay:220ms}
+.ur-reveal-ready{opacity:0;transform:translateY(14px)}
+.ur-reveal-ready.ur-revealed{opacity:1;transform:none;transition:opacity .55s ease,transform .55s cubic-bezier(.2,.75,.2,1)}
+@keyframes uniroomEnter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes uniroomModal{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes uniroomDrift{from{transform:translate3d(0,0,0)}to{transform:translate3d(13px,-14px,0)}}
+@media(max-width:767px){.nav-main,.nav-main .container{min-height:66px}.hero-title{letter-spacing:-.025em}.panel,.room-card,.feature-card{border-radius:14px}.btn{min-height:38px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}.ur-reveal-ready{opacity:1;transform:none}}

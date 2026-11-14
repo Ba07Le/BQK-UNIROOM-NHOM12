@@ -1,0 +1,7 @@
+/* Chọn tháng và năm: chỉ áp dụng cho trang lịch, không thay đổi các màn hình khác. */
+.uniroom-calendar-jump{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin:0 0 18px;padding:12px 14px;border:1px solid #e4ebf2;border-radius:12px;background:#f8fafc}
+.uniroom-calendar-jump label{font-size:13px;font-weight:650;color:#324b62;margin:0}
+.uniroom-calendar-jump .form-select{width:132px;max-width:100%}
+.uniroom-calendar-jump .form-control{width:100px;max-width:100%}
+.uniroom-calendar-jump .btn{white-space:nowrap;padding:7px 14px}
+@media(max-width:575px){.uniroom-calendar-jump{justify-content:flex-start;gap:8px}.uniroom-calendar-jump .form-select{width:calc(50% - 36px)}.uniroom-calendar-jump .form-control{width:calc(50% - 36px)}}

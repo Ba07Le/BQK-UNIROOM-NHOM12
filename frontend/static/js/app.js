@@ -87,7 +87,10 @@ function syncNav() {
 }
 function showPage(p) {
   // Room Manager chưa sử dụng Dashboard và trang Duyệt booking.
-  if (me?.role === "ROOM_MANAGER" && ["dashboard", "manager"].includes(p)) p = "rooms";
+  if (p === "manager" || (p === "dashboard" && me?.role === "ROOM_MANAGER")) {
+    window.location.assign("/static/room-manager.html");
+    return;
+  }
   if (p === "dashboard" && me?.role === "ADMIN") p = "adminDashboard";
   const isAuthPage = p === "login" || p === "register";
   const navbar = document.getElementById("main-navbar");
@@ -127,7 +130,7 @@ function homePage() {
       <h1 class="hero-title">Không gian phù hợp.<br><span>Lịch học chủ động.</span></h1>
       <p class="hero-copy">UniRoom giúp bạn tìm kiếm phòng học, phòng Lab, kiểm tra thông tin không gian và gửi yêu cầu đặt phòng trên cùng một nền tảng — rõ ràng, thuận tiện và dễ theo dõi.</p>
       <div class="d-flex flex-wrap gap-3 mt-4">
-        <button class="btn btn-hero-primary" onclick="showPage('rooms')">Khám phá phòng <i class="bi bi-arrow-right ms-2"></i></button>
+        <button class="btn btn-hero-primary" style="color: #fff !important;" onclick="showPage('rooms')">Khám phá phòng <i class="bi bi-arrow-right ms-2"></i></button>
         ${token ? '<button class="btn btn-hero-ghost" onclick="showPage(\'dashboard\')">Mở bảng điều khiển</button>' : '<button class="btn btn-hero-ghost" onclick="showPage(\'register\')">Tạo tài khoản miễn phí</button>'}
       </div>
       <div class="hero-proof mt-5"><div class="proof-avatars"><span><i class="bi bi-person-fill"></i></span><span><i class="bi bi-mortarboard-fill"></i></span><span><i class="bi bi-laptop-fill"></i></span></div><div><strong>Một nơi cho mọi nhu cầu đặt phòng</strong><small>Tìm kiếm · Đăng ký · Theo dõi</small></div></div>
@@ -138,7 +141,7 @@ function homePage() {
         <div class="visual-building"><div class="building-icon"><i class="bi bi-building"></i></div><div><strong>Không gian của bạn</strong><small>Phòng học & phòng thực hành</small></div><span class="visual-check"><i class="bi bi-check-lg"></i></span></div>
         <div class="visual-room-grid"><div class="visual-room visual-room-main"><div class="room-illustration"><i class="bi bi-easel2"></i><i class="bi bi-display"></i><i class="bi bi-person-workspace"></i></div><span class="visual-label">PHÒNG HỌC</span><strong>Học tập & thảo luận</strong><small>Không gian cho nhóm và lớp học</small></div><div class="visual-room visual-room-side"><div class="side-icon"><i class="bi bi-cpu"></i></div><span class="visual-label">PHÒNG LAB</span><strong>Thực hành chuyên môn</strong><small>Không gian thiết bị</small></div></div>
         <div class="visual-bottom"><span><i class="bi bi-calendar2-check"></i> Lịch đặt tập trung</span><span><i class="bi bi-shield-check"></i> Theo dõi trạng thái</span></div>
-        <div class="floating-note"><span class="floating-note-icon"><i class="bi bi-check2-circle"></i></span><span><strong>Quy trình rõ ràng</strong><small>Theo dõi từng yêu cầu đặt phòng</small></span></div>
+        
       </div>
     </div>
   </div>
@@ -167,7 +170,7 @@ function loginPage() {
       localStorage.setItem("uniroom_token", token);
       localStorage.setItem("uniroom_user", JSON.stringify(me));
       syncNav();
-      showPage(me.role === "ADMIN" ? "adminDashboard" : me.role === "ROOM_MANAGER" ? "rooms" : "dashboard");
+      showPage(me.role === "ROOM_MANAGER" ? "home" : me.role === "ADMIN" ? "adminDashboard" : "dashboard");
       alertMsg("Đăng nhập thành công");
     } catch (x) {
       alertMsg(x.message, "danger");
@@ -373,7 +376,7 @@ async function calendarPage() {
   if (!token) return showPage("login");
   const rows = await api("/calendar/me");
   const overview = me && ["ADMIN", "ROOM_MANAGER"].includes(me.role);
-  app.innerHTML = `<h2 class="section-title">${overview ? "Lịch tổng quan" : "Lịch cá nhân"}</h2><p class="muted">${overview ? "Lịch booking do User/Giảng viên tạo trong phạm vi được phân quyền." : "Các lịch đặt phòng được đồng bộ từ database."}</p><div class="panel"><div id="calendar"></div></div><div class="mt-3 d-flex gap-2"><a class="btn btn-outline-primary" href="/api/calendar/export.csv" onclick="return downloadWithAuth(event,'/api/calendar/export.csv')">Xuất Excel/CSV</a><button class="btn btn-outline-primary" onclick="downloadPDF()">Xuất PDF</button></div>`;
+  app.innerHTML = `<h2 class="section-title">${overview ? "Lịch tổng quan" : "Lịch cá nhân"}</h2><p class="muted">${overview ? "Lịch booking do User/Giảng viên tạo trong phạm vi được phân quyền." : "Các lịch đặt phòng được đồng bộ từ database."}</p><div class="panel"><div class="uniroom-calendar-jump" role="group" aria-label="Đi đến tháng và năm"><label for="calendar-jump-month">Tháng</label><select id="calendar-jump-month" class="form-select form-select-sm" aria-label="Chọn tháng">${Array.from({length:12},(_,i)=>`<option value="${i+1}">Tháng ${i+1}</option>`).join("")}</select><label for="calendar-jump-year">Năm</label><input id="calendar-jump-year" class="form-control form-control-sm" type="number" min="1900" max="2100" step="1" inputmode="numeric" aria-label="Chọn năm"><button id="calendar-jump-go" class="btn btn-primary btn-sm" type="button"><i class="bi bi-calendar-check me-1"></i>Đi đến</button></div><div id="calendar"></div></div><div class="mt-3 d-flex gap-2"><a class="btn btn-outline-primary" href="/api/calendar/export.csv" onclick="return downloadWithAuth(event,'/api/calendar/export.csv')">Xuất Excel/CSV</a><button class="btn btn-outline-primary" onclick="downloadPDF()">Xuất PDF</button></div>`;
   const cal = new FullCalendar.Calendar(document.getElementById("calendar"), {
     initialView: "dayGridMonth",
     locale: "vi",
@@ -418,6 +421,37 @@ async function calendarPage() {
     },
   });
   cal.render();
+  // Thanh chọn tháng/năm cho cả lịch cá nhân và lịch tổng quan.
+  const jumpMonth = document.getElementById("calendar-jump-month");
+  const jumpYear = document.getElementById("calendar-jump-year");
+  const jumpGo = document.getElementById("calendar-jump-go");
+  const syncCalendarJump = () => {
+    const visibleDate = cal.getDate();
+    jumpMonth.value = String(visibleDate.getMonth() + 1);
+    jumpYear.value = String(visibleDate.getFullYear());
+  };
+  const goToSelectedMonth = () => {
+    const month = Number(jumpMonth.value);
+    const year = Number(jumpYear.value);
+    if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 1900 || year > 2100) {
+      alertMsg("Vui lòng chọn tháng và năm hợp lệ (1900–2100).", "warning");
+      return;
+    }
+    cal.gotoDate(new Date(year, month - 1, 1, 12));
+    syncCalendarJump();
+  };
+  syncCalendarJump();
+  jumpGo.addEventListener("click", goToSelectedMonth);
+  jumpYear.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") goToSelectedMonth();
+  });
+  // Đồng bộ khi dùng Today hoặc các nút tháng trước / tháng sau của FullCalendar.
+  const calendarToolbar = document.getElementById("calendar");
+  calendarToolbar.addEventListener("click", (event) => {
+    if (event.target.closest(".fc-prev-button, .fc-next-button, .fc-today-button")) {
+      syncCalendarJump();
+    }
+  });
   // Sau 2 phút kể từ lúc từ chối, lịch bị loại khỏi cả ba vai trò.
   // Tự đồng bộ dữ liệu khi trang lịch còn hiển thị, không cần tải lại thủ công.
   if (window.uniroomCalendarRefreshTimer) clearInterval(window.uniroomCalendarRefreshTimer);
@@ -1024,21 +1058,64 @@ async function saveRule(e, id) {
     alertMsg(x.message, "danger");
   }
 }
+let aiConvId = null;
 function aiPage() {
-  app.innerHTML = `<div class="row justify-content-center"><div class="col-lg-8"><div class="panel"><h2 class="section-title">UniRoom AI Assistant</h2><p class="muted">Trợ lý hỗ trợ tìm phòng và giải thích quy trình. Khi chưa cấu hình AI ngoài, hệ thống dùng chế độ dự phòng nội bộ.</p><div id="chat" class="mb-3"></div><form id="chat-form" class="d-flex gap-2"><input class="form-control" name="message" placeholder="Ví dụ: Tôi cần phòng Lab..." required><button class="btn btn-primary">Gửi</button></form></div></div></div>`;
-  document.getElementById("chat-form").onsubmit = async (e) => {
+  app.innerHTML = `<div class="row justify-content-center"><div class="col-lg-8"><div class="panel">
+    <div class="d-flex justify-content-between align-items-start gap-2">
+      <div><h2 class="section-title">UniRoom AI Assistant</h2>
+      <p class="muted">Hỏi phòng trống, nhờ gợi ý phòng phù hợp hoặc đặt phòng ngay trong cuộc trò chuyện.</p></div>
+      <button type="button" id="chat-new" class="btn btn-sm btn-outline-secondary">Cuộc mới</button>
+    </div>
+    <div id="chat" class="mb-3 d-flex flex-column gap-2" style="height:420px;overflow-y:auto"></div>
+    <form id="chat-form" class="d-flex gap-2">
+      <input class="form-control" name="message" maxlength="1000" autocomplete="off" required
+        placeholder="Ví dụ: Phòng nào trống chiều mai 14h-16h, 40 người, có máy chiếu?">
+      <button class="btn btn-primary">Gửi</button>
+    </form></div></div></div>`;
+
+  const chat = document.getElementById("chat");
+  const form = document.getElementById("chat-form");
+  const add = (text, who, cls) => {
+    const d = document.createElement("div");
+    d.className = cls || (who === "me" ? "alert alert-primary mb-0 align-self-end" : "alert alert-light mb-0 align-self-start");
+    d.style.cssText = "max-width:85%;white-space:pre-wrap";
+    d.textContent = text;
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+    return d;
+  };
+  const reset = () => {
+    aiConvId = null;
+    chat.innerHTML = "";
+    add("Xin chào! Mình giúp bạn tìm phòng trống, gợi ý phòng phù hợp và đặt phòng.", "ai");
+  };
+  reset();
+  document.getElementById("chat-new").onclick = reset;
+
+  form.onsubmit = async (e) => {
     e.preventDefault();
-    const f = new FormData(e.target);
+    const input = form.elements.message;
+    const btn = form.querySelector("button");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    add(text, "me");
+    btn.disabled = true;
+    const wait = add("Đang trả lời...", "ai");
     try {
       const d = await api("/ai/chat", {
         method: "POST",
-        body: { message: f.get("message") },
+        body: { message: text, conversation_id: aiConvId },
       });
-      document.getElementById("chat").innerHTML +=
-        `<div class="alert alert-light"><b>Bạn:</b> ${esc(f.get("message"))}<br><b>UniRoom:</b> ${esc(d.answer)}</div>`;
-      e.target.reset();
+      aiConvId = d.conversation_id;
+      wait.textContent = d.answer;
     } catch (x) {
-      alertMsg(x.message, "danger");
+      wait.textContent = x.message;
+      wait.className = "alert alert-danger mb-0 align-self-start";
+    } finally {
+      btn.disabled = false;
+      input.focus();
+      chat.scrollTop = chat.scrollHeight;
     }
   };
 }
@@ -1080,7 +1157,7 @@ async function initializeApp() {
   }
   syncNav();
   if (token && me) {
-    showPage(me.role === "ADMIN" ? "adminDashboard" : me.role === "ROOM_MANAGER" ? "rooms" : "dashboard");
+    showPage(me.role === "ROOM_MANAGER" ? "home" : me.role === "ADMIN" ? "adminDashboard" : "dashboard");
   } else {
     showPage("home");
   }
