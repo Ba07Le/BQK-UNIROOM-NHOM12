@@ -786,3 +786,9 @@ def manager_add_equipment(payload:dict,user=Depends(require_roles("ROOM_MANAGER"
     if link: link.quantity=quantity
     else: db.add(models.RoomEquipment(room_id=room_id,equipment_id=item.id,quantity=quantity))
     db.commit(); return {"success":True,"message":"Đã cập nhật thiết bị phòng"}
+
+
+# Register Room Manager Level 1 endpoints on the main Uvicorn application.
+# Keep this import at the end: room_manager_level1 imports require_roles from this module.
+from .room_manager_level1 import router as room_manager_level1_router
+app.include_router(room_manager_level1_router)

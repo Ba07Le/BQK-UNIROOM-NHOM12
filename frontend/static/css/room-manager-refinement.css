@@ -1,0 +1,21 @@
+/* Room Manager — same restrained UniRoom visual language. */
+:root{--rm-ink:#1c2b3e;--rm-muted:#657487;--rm-border:#dfe7eb;--rm-blue:#245c83;--rm-pale:#f6f7f6}
+body{background:var(--rm-pale);-webkit-font-smoothing:antialiased}
+.rm-topbar{background:#142838;border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 5px 24px rgba(20,40,56,.1)}
+.rm-brand{letter-spacing:-.035em}
+.rm-heading h1{letter-spacing:-.035em}
+.rm-tabs{scrollbar-width:thin}
+.rm-tabs button{transition:background .2s ease,color .2s ease,transform .2s ease}
+.rm-tabs button:hover{transform:translateY(-1px)}
+.rm-content .card,.rm-content .panel,.rm-content .rm-card,.rm-content table,.rm-content .table-responsive{transition:box-shadow .25s ease,border-color .25s ease}
+.rm-content .card:hover,.rm-content .panel:hover,.rm-content .rm-card:hover{box-shadow:0 12px 30px rgba(24,43,57,.075)}
+.rm-content .table tbody tr{transition:background .18s ease}
+.rm-content .table tbody tr:hover{background:rgba(36,92,131,.035)}
+.rm-layout .btn-primary{background:#245c83;border-color:#245c83}
+.rm-layout .btn-primary:hover{background:#174665;border-color:#174665;transform:translateY(-1px)}
+.rm-layout button,.rm-layout input,.rm-layout select{transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease}
+.rm-layout :is(button,a,input,select):focus-visible{outline:3px solid rgba(36,92,131,.22);outline-offset:2px}
+.ur-enter{animation:urRmEnter .48s cubic-bezier(.2,.72,.2,1) both}
+.ur-enter.ur-delay-1{animation-delay:55ms}.ur-enter.ur-delay-2{animation-delay:110ms}.ur-enter.ur-delay-3{animation-delay:165ms}
+@keyframes urRmEnter{from{opacity:0;transform:translateY(11px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
