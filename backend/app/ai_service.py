@@ -19,6 +19,7 @@ BLOCKING = ('PENDING', 'APPROVED', 'CHECKED_IN')
 class SearchRequest(BaseModel):
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
+    requested_date: Optional[date] = None  # Ngày đã biết, chưa có giờ bắt đầu
     min_capacity: int = Field(default=1, ge=1, le=10000)
     building: Optional[str] = Field(default=None, max_length=100)
     room_type: Optional[str] = Field(default=None, max_length=100)
@@ -37,8 +38,8 @@ class SearchRequest(BaseModel):
         return [x.strip()[:60] for x in items if x.strip()]
 
     def check_window(self):
-        if (self.start_at is None) != (self.end_at is None):
-            raise ValueError('Cần cung cấp cả thời gian bắt đầu và kết thúc.')
+        if self.end_at and not self.start_at:
+            raise ValueError('Cần cung cấp giờ bắt đầu trước giờ kết thúc.')
         if self.start_at and self.end_at:
             if self.start_at.tzinfo or self.end_at.tzinfo:
                 raise ValueError('Vui lòng dùng giờ địa phương dạng YYYY-MM-DDTHH:MM, không kèm múi giờ.')
@@ -51,6 +52,8 @@ class SearchRequest(BaseModel):
 
 
 def search_rooms(db, req: SearchRequest):
+    if (req.start_at is None) != (req.end_at is None):
+        raise ValueError('Cần đủ giờ bắt đầu và kết thúc để kiểm tra phòng trống.')
     req.check_window()
     query = db.query(models.Room).options(
         joinedload(models.Room.building), joinedload(models.Room.room_type),
@@ -158,44 +161,56 @@ def _equipment_matches(available, required):
 
 
 def _date_and_times(message, previous):
-    """Vietnamese date + clock expressions, including 7 giờ sáng / 10 giờ rưỡi sáng."""
+    """Return partial start/end/date; never guess a missing clock time."""
     low = _normalized(message)
     date_match = re.search(r"(?<!\d)(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?!\d)", low)
-    day = None
     if not date_match:
         date_match = re.search(r"(?<!\d)(\d{1,2})\s*tháng\s*(\d{1,2})\s*năm\s*(\d{4})(?!\d)", low)
+    day = None
     if date_match:
         try:
             day = date(int(date_match[3]), int(date_match[2]), int(date_match[1]))
         except ValueError:
-            raise ValueError("Ngày không hợp lệ. Hãy dùng ngày/tháng/năm, ví dụ 14/11/2026.")
-    elif re.search(r"\bngày mai\b|\bmai\b", low):
-        day = (datetime.now() + timedelta(days=1)).date()
-    elif re.search(r"\bhôm nay\b", low):
-        day = datetime.now().date()
-    elif re.search(r"\bngày kia\b|\bmốt\b", low):
+            raise ValueError('Ngày không hợp lệ. Hãy dùng ngày/tháng/năm.')
+    elif re.search(r'\bngày kia\b|\bmốt\b', low):
         day = (datetime.now() + timedelta(days=2)).date()
-    # Restrict clock matches to actual time markers, not room capacity or calendar numbers.
-    clock = re.compile(r"(?<![\d/])(\d{1,2})\s*(?:h|giờ|:)\s*(\d{1,2}|rưỡi|ruoi)?\s*(sáng|chiều|tối|đêm)?", re.I)
-    times=[]
-    for m in clock.finditer(low):
-        hour=int(m[1]); minute=30 if m[2] in ('rưỡi','ruoi') else int(m[2] or 0)
-        meridiem=m[3]
-        if meridiem in ('chiều','tối') and hour < 12:hour+=12
-        if meridiem=='đêm' and hour==12:hour=0
-        if hour>23 or minute>59:raise ValueError('Giờ không hợp lệ.')
-        times.append((hour,minute))
-    if day is None and times and previous.get('start_at'):
-        day=datetime.fromisoformat(previous['start_at']).date()
+    elif re.search(r'\bngày mai\b|\bmai\b', low):
+        day = (datetime.now() + timedelta(days=1)).date()
+    elif re.search(r'\bhôm nay\b', low):
+        day = datetime.now().date()
+    explicit_day = day is not None
     if day is None:
-        return None,None
-    if len(times)>=2:
-        return datetime.combine(day,datetime.min.time()).replace(hour=times[0][0],minute=times[0][1]), datetime.combine(day,datetime.min.time()).replace(hour=times[1][0],minute=times[1][1])
-    if not times and previous.get('start_at') and previous.get('end_at'):
-        old_start=datetime.fromisoformat(previous['start_at']).time()
-        old_end=datetime.fromisoformat(previous['end_at']).time()
-        return datetime.combine(day,old_start),datetime.combine(day,old_end)
-    return None,None
+        if previous.get('start_at'):
+            day = datetime.fromisoformat(str(previous['start_at'])).date()
+        elif previous.get('requested_date'):
+            day = date.fromisoformat(str(previous['requested_date']))
+    clock = re.compile(r"(?<![\d/])(\d{1,2})\s*(?:h|giờ|:)\s*(\d{1,2}|rưỡi|ruoi)?\s*(sáng|chiều|tối|đêm)?", re.I)
+    times = []
+    for m in clock.finditer(low):
+        hour = int(m[1]); minute = 30 if m[2] in ('rưỡi', 'ruoi') else int(m[2] or 0)
+        if m[3] in ('chiều', 'tối') and hour < 12: hour += 12
+        if m[3] == 'đêm' and hour == 12: hour = 0
+        if hour > 23 or minute > 59: raise ValueError('Giờ không hợp lệ.')
+        times.append((hour, minute))
+    if day is None:
+        return None, None, None, False
+    make = lambda hm: datetime.combine(day, datetime.min.time()).replace(hour=hm[0], minute=hm[1])
+    if len(times) >= 2:
+        return make(times[0]), make(times[1]), day, True
+    if len(times) == 1:
+        # A short reply "đến 10h" completes the previous start time.
+        end_only = bool(re.search(r'\b(?:đến|tới|kết thúc|cho tới|đến lúc)\b', low)) and previous.get('start_at')
+        if end_only:
+            old_start = datetime.fromisoformat(str(previous['start_at']))
+            return datetime.combine(day, old_start.time()), make(times[0]), day, True
+        return make(times[0]), None, day, True
+    if explicit_day:
+        if previous.get('start_at'):
+            old_start = datetime.fromisoformat(str(previous['start_at']))
+            old_end = datetime.fromisoformat(str(previous['end_at'])) if previous.get('end_at') else None
+            return datetime.combine(day, old_start.time()), datetime.combine(day, old_end.time()) if old_end else None, day, True
+        return None, None, day, True
+    return None, None, day, False
 
 
 def _local_extract(message, previous=None):
@@ -243,44 +258,84 @@ def _local_extract(message, previous=None):
     if floor:data['floor']=int(floor[1])
     code=re.search(r'\b([a-z]\.?[a-z0-9]*\.?\d{2,3})\b',message,re.I)
     if code and not building:data['room_code']=code[1]
-    start,end=_date_and_times(message,old)
-    if start and end:data['start_at']=start;data['end_at']=end
-    # A date with no complete clock window must not inherit stale dates.
-    elif re.search(r'(?<!\d)\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s*tháng\s*\d{1,2}\s*năm\s*\d{4}',low):
-        data.pop('start_at',None);data.pop('end_at',None)
+    start,end,day,changed=_date_and_times(message,old)
+    if changed:
+        data['requested_date']=day
+        if start is not None:
+            data['start_at']=start
+            if end is not None:data['end_at']=end
+            else:data.pop('end_at',None)
+        else:
+            data.pop('start_at',None);data.pop('end_at',None)
     return intent,SearchRequest.model_validate(data),'local'
 
 
+def _merge_ai_fields(local, obj, message, previous):
+    """Use AI for fields not confidently extracted locally; validate all results."""
+    if not isinstance(obj, dict): raise ValueError('AI response is not an object')
+    data = local.model_dump(mode='json')
+    old = previous or {}
+    folded = _fold(message)
+    # Only accept fields that are explicitly present in the current message.
+    # Local explicit constraints take precedence; AI must not fabricate availability.
+    markers = {
+        'min_capacity': ('nguoi', 'sinh vien', 'cho', 'suc chua'),
+        'building': ('toa', 'khu'), 'floor': ('tang', 'lau'),
+        'room_type': ('lab', 'thuc hanh', 'ly thuyet', 'loai phong'),
+        'equipment': ('may chieu', 'may tinh', 'dieu hoa', 'wifi', 'micro', 'thiet bi', 'bang'),
+        'room_code': ('phong', 'ma phong'),
+    }
+    for field, words in markers.items():
+        if field not in obj or obj[field] is None or not any(w in folded for w in words):continue
+        # Explicit local edits and existing filters should not be overwritten by a guess.
+        if field == 'min_capacity' and data[field] != old.get(field, 1):continue
+        if field in ('building','floor','room_type','room_code') and data.get(field) != old.get(field):continue
+        if field == 'equipment' and data.get(field) != old.get(field, []):continue
+        data[field] = obj[field]
+    for field in ('title', 'purpose'):
+        if isinstance(obj.get(field),str) and obj[field].strip():data[field]=obj[field].strip()
+    # Date/time: only accept when the user actually mentioned a date/time.
+    time_words = ('gio','luc','sang','chieu','toi','ngay','mai','hom nay','mot','h')
+    if any(re.search(r'\b'+re.escape(w)+r'\b',folded) for w in time_words) or re.search(r'\d{1,2}[/:]\d',message):
+        for field in ('start_at','end_at','requested_date'):
+            value=obj.get(field)
+            if not isinstance(value,str) or not value:continue
+            if field in ('start_at','end_at') and data.get(field) and data.get(field)!=old.get(field):continue
+            if field=='end_at' and not (data.get('start_at') or old.get('start_at')):continue
+            data[field]=value
+    # If AI changes only end time, retain previous start; reject invalid dates.
+    candidate=SearchRequest.model_validate(data)
+    if candidate.start_at and candidate.end_at:
+        candidate.check_window()
+    return candidate
+
+
 def parse_intent(message,history=None,previous=None):
-    """Deterministic Vietnamese parsing is authoritative for explicit edits.
-    OpenAI may interpret other language but must not override clearly stated filters.
-    """
     intent,local,mode=_local_extract(message,previous)
     if intent in ('reset','policy'):return intent,local,mode
-    if not os.getenv('OPENAI_API_KEY', '').strip():
+    if not os.getenv('OPENAI_API_KEY','').strip():
         logger.warning('UniRoom AI: OPENAI_API_KEY missing; using local parser')
         return intent,local,'local_no_api_key'
     try:
         system=(
-            'Phân tích yêu cầu phòng UniRoom. Chỉ JSON gồm intent(search|policy|other), '
-            'start_at,end_at,min_capacity,building,room_type,room_code,equipment,floor,title,purpose. '
-            'Dữ liệu cũ đã được server xử lý. Chỉ trích xuất điều kiện NÓI RÕ trong tin nhắn hiện tại. '
-            'Không tự suy đoán thời gian hay điều kiện. Ngày giờ YYYY-MM-DDTHH:MM. '
-            'Nếu chỉ bổ sung thời gian thì giữ nguyên các bộ lọc cũ. '
-            'Hôm nay tại Việt Nam: '+datetime.now().isoformat(timespec='minutes')
+            'Bạn là bộ phân tích yêu cầu UniRoom. Chỉ trả JSON object, không trả lời văn bản. '
+            'Các trường có thể dùng: intent(search|policy|other), start_at, end_at, requested_date, '
+            'min_capacity, building, room_type, room_code, equipment, floor, title, purpose. '
+            'Chỉ xuất trường được nói rõ trong tin nhắn HIỆN TẠI; không đoán thông tin còn thiếu. '
+            'Nếu chỉ có một giờ bắt đầu thì end_at=null; nếu người dùng nói "đến 10h" thì chỉ điền end_at. '
+            'Ngày giờ theo YYYY-MM-DDTHH:MM, requested_date YYYY-MM-DD; múi giờ Việt Nam. '
+            'Bối cảnh bộ lọc trước (chỉ để hiểu câu tiếp nối): '+json.dumps(previous or {},ensure_ascii=False,default=str)[:1500]+'. '
+            'Ngày giờ hiện tại Việt Nam: '+datetime.now().isoformat(timespec='minutes')
         )
         obj=_openai_chat_json(system,message)
-        # Only use LLM for optional title/purpose; deterministic matching handles
-        # availability-critical fields to prevent stale/hallucinated dates.
-        for key in ('title','purpose'):
-            if isinstance(obj.get(key),str) and obj[key].strip():setattr(local,key,obj[key].strip())
-        return intent,local,'openai+local'
+        if obj.get('intent')=='policy':return 'policy',local,'openai+local'
+        merged=_merge_ai_fields(local,obj,message,previous)
+        return intent,merged,'openai+local'
     except httpx.HTTPStatusError as exc:
-        logger.warning('UniRoom AI HTTP status %s; using local parser', exc.response.status_code)
-        return intent,local,'local_api_error'
-    except (httpx.RequestError, ValueError, KeyError, IndexError, TypeError) as exc:
-        logger.warning('UniRoom AI request/response failed (%s); using local parser', type(exc).__name__)
-        return intent,local,'local_api_error'
+        logger.warning('UniRoom AI HTTP status %s; using local parser',exc.response.status_code)
+    except (httpx.RequestError,ValueError,KeyError,IndexError,TypeError) as exc:
+        logger.warning('UniRoom AI parse failed (%s): %s; using local parser',type(exc).__name__,str(exc)[:150])
+    return intent,local,'local_api_error'
 
 POLICY=('UniRoom: chọn phòng và thời gian → gửi yêu cầu → chờ duyệt nếu cần → theo dõi trạng thái. '
         'Lịch đã đặt hoặc bảo trì có thể chặn yêu cầu. AI không tự đặt, hủy hay duyệt booking.')
@@ -311,22 +366,27 @@ def respond(db,message,history=None,previous=None):
     if intent=='reset':return {'answer':'Đã bắt đầu tìm kiếm mới. Bạn cần phòng cho bao nhiêu người?','rooms':[],'filters':{},'missing':['min_capacity'],'mode':mode}
     if intent=='policy':return {'answer':POLICY,'rooms':[],'filters':previous or {},'missing':[],'mode':mode}
     if intent=='other':return {'answer':'Mình hỗ trợ tìm phòng, kiểm tra lịch trống và hướng dẫn đặt phòng. Bạn cần hỗ trợ gì?','rooms':[],'filters':previous or {},'missing':[],'mode':mode}
-    # Do not assert room availability until a complete, valid time window is provided.
+    filters=req.model_dump(mode='json')
+    if not req.start_at or not req.end_at:
+        if req.start_at:
+            answer=f'Mình đã ghi nhận giờ bắt đầu {req.start_at:%H:%M} ngày {req.start_at:%d/%m/%Y}. Bạn muốn sử dụng phòng đến mấy giờ?'
+            missing=['end_at']
+        elif req.requested_date:
+            answer=f'Mình đã ghi nhận ngày {req.requested_date:%d/%m/%Y}. Bạn muốn bắt đầu và kết thúc lúc mấy giờ?'
+            missing=['start_at','end_at']
+        else:
+            answer='Bạn muốn sử dụng phòng vào ngày nào, từ mấy giờ đến mấy giờ?'
+            missing=['start_at','end_at']
+        return {'answer':answer,'rooms':[],'filters':filters,'missing':missing,'conflicts':[],'mode':mode}
     req.check_window()
-    missing=[]
-    if not req.start_at or not req.end_at:missing.append('time')
     rooms=search_rooms(db,req)
-    conflicts=_conflict_details(db,req) if not missing or (req.start_at and req.end_at) else []
+    conflicts=_conflict_details(db,req)
     if conflicts:
         summary='; '.join(x['code']+' ('+x['reason']+')' for x in conflicts[:3])
         answer='Một số phòng không khả dụng trong khung giờ này: '+summary+'. Bạn muốn đổi phòng hay đổi ngày/giờ?'
         if rooms:answer+=' Có '+str(len(rooms))+' phòng thay thế phù hợp bên dưới.'
-    elif rooms and not missing:
-        answer='Tìm thấy '+str(len(rooms))+' phòng trống phù hợp. Chọn “Đặt phòng này” để mở biểu mẫu đã điền sẵn; lịch sẽ được kiểm tra lại khi gửi.'
     elif rooms:
-        answer='Mình tìm thấy '+str(len(rooms))+' phòng phù hợp theo tiêu chí hiện có, nhưng chưa xác nhận lịch trống.'
+        answer='Tìm thấy '+str(len(rooms))+' phòng trống phù hợp. Chọn “Đặt phòng này” để mở biểu mẫu đã điền sẵn; lịch sẽ được kiểm tra lại khi gửi.'
     else:
-        answer='Chưa tìm thấy phòng thỏa đồng thời các điều kiện đang giữ: '+', '.join(([f"ít nhất {req.min_capacity} người"] if req.min_capacity>1 else []) + ([f"loại {req.room_type}"] if req.room_type else []) + ([f"thiết bị {', '.join(req.equipment)}"] if req.equipment else []) + ([f"tòa {req.building}"] if req.building else []) + ([f"tầng {req.floor}"] if req.floor is not None else [])) + '. Bạn muốn bỏ hoặc đổi điều kiện nào?' 
-    if 'time' in missing and rooms:answer+=' Nếu muốn kiểm tra lịch trống để đặt phòng, bạn cho mình ngày và khung giờ nhé.'
-    if req.min_capacity==1 and rooms and 'time' in missing:answer+=' Nếu có yêu cầu sức chứa, bạn có thể cho biết thêm số người.'
-    return {'answer':answer,'rooms':rooms,'filters':req.model_dump(mode='json'),'missing':missing,'conflicts':conflicts,'mode':mode}
+        answer='Không tìm thấy phòng còn trống phù hợp với điều kiện và thời gian đã chọn. Bạn muốn đổi thời gian hoặc bộ lọc nào?'
+    return {'answer':answer,'rooms':rooms,'filters':filters,'missing':[],'conflicts':conflicts,'mode':mode}

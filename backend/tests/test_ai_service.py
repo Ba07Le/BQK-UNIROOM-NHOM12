@@ -87,3 +87,40 @@ def test_followup_slot_returns_bookable_room(db):
     assert second['missing']==[]
     assert second['rooms'][0]['availability']=='available'
     assert second['filters']['start_at'].endswith('07:00:00')
+
+# Multi-turn partial-time behavior and HTTP-model extraction are regression tests.
+def test_partial_time_asks_end_without_rooms(db, monkeypatch):
+    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    first=respond(db, 'tôi muốn đặt phòng lúc 7 giờ sáng ngày 15/11/2026')
+    assert first['rooms']==[]
+    assert first['missing']==['end_at']
+    assert first['filters']['start_at'].startswith('2026-11-15T07:00')
+    second=parse_intent('đến 10 giờ sáng',previous=first['filters'])[1]
+    assert second.start_at==datetime(2026,11,15,7)
+    assert second.end_at==datetime(2026,11,15,10)
+
+
+def test_date_only_and_followup_start(db, monkeypatch):
+    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    first=respond(db,'tìm phòng ngày 20/11/2026')
+    assert first['rooms']==[] and first['filters']['requested_date']=='2026-11-20'
+    second=parse_intent('bắt đầu lúc 8h sáng',previous=first['filters'])[1]
+    assert second.start_at==datetime(2026,11,20,8)
+    assert second.end_at is None
+
+
+def test_openai_fields_used_and_validated(monkeypatch):
+    from app import ai_service
+    monkeypatch.setenv('OPENAI_API_KEY','test-key')
+    monkeypatch.setattr(ai_service,'_openai_chat_json',lambda system,message:{'min_capacity':30,'title':'Học nhóm'})
+    intent,req,mode=parse_intent('cần phòng cho khoảng 30 người')
+    assert req.min_capacity==30 and req.title=='Học nhóm' and mode=='openai+local'
+
+
+def test_openai_error_fallback(monkeypatch):
+    from app import ai_service
+    monkeypatch.setenv('OPENAI_API_KEY','test-key')
+    def broken(*args):raise ValueError('invalid JSON')
+    monkeypatch.setattr(ai_service,'_openai_chat_json',broken)
+    _,req,mode=parse_intent('phòng cho 25 người')
+    assert req.min_capacity==25 and mode=='local_api_error'
