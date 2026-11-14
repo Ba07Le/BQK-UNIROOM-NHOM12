@@ -75,7 +75,10 @@ function syncNav() {
   setNavVisible("nav-register", !logged);
   setNavVisible("nav-logout", logged);
   // Chỉ Admin được xem liên kết duyệt booking; Manager tạm thời không có mục này.
-  setNavVisible("nav-manager", logged && role === "ADMIN");
+  setNavVisible(
+  "nav-manager",
+  logged && ["ROOM_MANAGER", "ADMIN"].includes(role),
+);
   setNavVisible("nav-admin", logged && role === "ADMIN");
   document.getElementById("nav-dashboard").querySelector("a").textContent =
     role === "ADMIN" ? "Dashboard" : role === "USER" ? "Theo dõi đặt phòng" : "Bảng điều khiển";
@@ -214,20 +217,12 @@ async function loadRooms() {
     alertMsg(e.message, "danger");
   }
 }
-function bookingForm(id, name, capacity, prefill = null) {
+function bookingForm(id, name, capacity) {
   if (!token) {
     alertMsg("Vui lòng đăng nhập trước khi đặt phòng", "warning");
     return showPage("login");
   }
   app.innerHTML = `<div class="row justify-content-center"><div class="col-lg-7"><div class="panel"><button class="btn btn-sm btn-link px-0" onclick="roomsPage()">← Quay lại</button><h2 class="section-title">Đặt ${esc(name)}</h2><p class="muted">Sức chứa tối đa: ${capacity} người</p><form id="booking-form"><input type="hidden" name="room_id" value="${id}"><label class="form-label">Tên buổi sử dụng</label><input class="form-control mb-3" name="title" required minlength="3"><label class="form-label">Mục đích</label><textarea class="form-control mb-3" name="purpose"></textarea><label class="form-label">Số người</label><input class="form-control mb-3" type="number" name="attendee_count" min="1" max="${capacity}" value="1" required><div class="row"><div class="col"><label class="form-label">Bắt đầu</label><input class="form-control mb-3" type="datetime-local" name="start_at" required></div><div class="col"><label class="form-label">Kết thúc</label><input class="form-control mb-3" type="datetime-local" name="end_at" required></div></div><button class="btn btn-primary w-100">Gửi yêu cầu đặt phòng</button></form></div></div></div>`;
-  if (prefill) {
-    const form = document.getElementById("booking-form");
-    for (const key of ["title", "purpose", "attendee_count", "start_at", "end_at"]) {
-      if (prefill[key] !== undefined && prefill[key] !== null && form.elements[key])
-        form.elements[key].value = String(prefill[key]).slice(0, key.endsWith("_at") ? 16 : 180);
-    }
-    form.insertAdjacentHTML("afterbegin", '<div class="alert alert-info">Thông tin được AI điền sẵn. Vui lòng kiểm tra trước khi gửi yêu cầu.</div>');
-  }
   document.getElementById("booking-form").onsubmit = async (e) => {
     e.preventDefault();
     try {
@@ -553,7 +548,7 @@ function managerTab(tab) {
     el.innerHTML = `<div class="panel"><div class="d-flex justify-content-between align-items-center mb-3"><div class="d-flex align-items-center gap-2"><h5 class="mb-0">Yêu cầu đang chờ xử lý</h5><span class="badge text-bg-primary">${me.role === "ADMIN" ? "Admin" : "Manager"}</span></div><button class="btn btn-sm btn-outline-primary" onclick="managerPage()">Làm mới</button></div>${d.bookings?.length ? `<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Người đặt</th><th>Phòng</th><th>Nội dung</th><th>Thời gian</th><th>Thao tác</th></tr></thead><tbody>${d.bookings.map((b) => `<tr><td>${esc(b.user)}</td><td><b>${esc(b.room_code)}</b></td><td>${esc(b.title)}<div class="small muted">${esc(b.purpose || "")}</div></td><td>${new Date(b.start_at).toLocaleString("vi-VN")}<br>${new Date(b.end_at).toLocaleString("vi-VN")}</td><td class="text-nowrap"><button class="btn btn-sm btn-success" onclick="decision(${b.id},'APPROVED')">Duyệt</button> <button class="btn btn-sm btn-outline-danger" onclick="decision(${b.id},'REJECTED')">Từ chối</button></td></tr>`).join("")}</tbody></table></div>` : '<p class="muted mb-0">Không có yêu cầu chờ duyệt.</p>'}</div>`;
   }
   if (tab === "rooms") {
-    el.innerHTML = `<div class="panel"><div class="d-flex justify-content-between flex-wrap gap-2 mb-3"><h5>Danh mục phòng & tình trạng</h5><button class="btn btn-primary btn-sm" onclick="showCreateRoom()">+ Thêm phòng</button></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Mã phòng</th><th>Tòa nhà</th><th>Loại</th><th>Sức chứa</th><th>Tầng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${(d.rooms || []).map((r) => `<tr><td><b>${esc(r.code)}</b><div class="small muted">${esc(r.name)}</div></td><td>${esc(r.building)}</td><td>${esc(r.room_type)}</td><td>${r.capacity}</td><td>${r.floor}</td><td><span class="badge ${r.status === "ACTIVE" ? "text-bg-success" : r.status === "MAINTENANCE" ? "text-bg-warning" : "text-bg-secondary"}">${esc(r.status)}</span></td><td><button type="button" class="btn btn-sm btn-outline-primary" onclick="showEditRoom(${r.id})"><i class="bi bi-pencil-square me-1"></i>Sửa</button></td></tr>`).join("")}</tbody></table></div><p class="small muted mb-0">Room Manager được sửa thông tin những phòng được phân công quản lý.</p></div>`;
+    el.innerHTML = `<div class="panel"><div class="d-flex justify-content-between flex-wrap gap-2 mb-3"><h5>Danh mục phòng & tình trạng</h5><button class="btn btn-primary btn-sm" onclick="showCreateRoom()">+ Thêm phòng</button></div><div class="table-responsive"><table class="table"><thead><tr><th>Mã phòng</th><th>Tòa nhà</th><th>Loại</th><th>Sức chứa</th><th>Tầng</th><th>Trạng thái</th></tr></thead><tbody>${(d.rooms || []).map((r) => `<tr><td><b>${esc(r.code)}</b><div class="small muted">${esc(r.name)}</div></td><td>${esc(r.building)}</td><td>${esc(r.room_type)}</td><td>${r.capacity}</td><td>${r.floor}</td><td><span class="badge ${r.status === "ACTIVE" ? "text-bg-success" : r.status === "MAINTENANCE" ? "text-bg-warning" : "text-bg-secondary"}">${esc(r.status)}</span></td></tr>`).join("")}</tbody></table></div><p class="small muted mb-0">Room Manager có thể theo dõi danh mục phòng; thao tác thêm phòng phụ thuộc quyền được cấp.</p></div>`;
   }
   if (tab === "maintenance") {
     el.innerHTML = `<div class="row g-3"><div class="col-lg-5"><form class="panel" id="maintenance-form"><h5>Tạo lịch bảo trì / ghi nhận sự cố</h5><label class="form-label">Phòng</label><select class="form-select mb-2" name="room_id" required>${(d.rooms || []).map((r) => `<option value="${r.id}">${esc(r.code)} · ${esc(r.name)}</option>`).join("")}</select><label class="form-label">Bắt đầu</label><input class="form-control mb-2" type="datetime-local" name="start_at" required><label class="form-label">Kết thúc</label><input class="form-control mb-2" type="datetime-local" name="end_at" required><label class="form-label">Lý do / mô tả</label><textarea class="form-control mb-3" name="reason" required></textarea><button class="btn btn-primary">Lưu lịch bảo trì</button></form></div><div class="col-lg-7"><div class="panel"><h5>Lịch bảo trì</h5>${d.maint?.length ? d.maint.map((m) => `<div class="border-bottom py-3 d-flex justify-content-between gap-2"><div><b>${esc(m.room)} · ${esc(m.reason)}</b><div class="small muted">${new Date(m.start_at).toLocaleString("vi-VN")} – ${new Date(m.end_at).toLocaleString("vi-VN")}</div><span class="badge text-bg-${m.status === "ACTIVE" ? "warning" : "success"}">${esc(m.status)}</span></div>${m.status === "ACTIVE" ? `<button class="btn btn-sm btn-outline-success align-self-center" onclick="finishMaintenance(${m.id})">Hoàn tất</button>` : ""}</div>`).join("") : '<p class="muted">Chưa có lịch bảo trì.</p>'}</div></div></div>`;
@@ -604,7 +599,7 @@ async function showCreateRoom() {
   try {
     const meta = await api("/rooms/meta");
     const host = document.getElementById("manager-content");
-    host.innerHTML = `<div class="panel"><h5>Thêm phòng mới</h5><form id="create-room-form" class="row g-3"><div class="col-md-6"><label class="form-label">Mã phòng</label><input class="form-control" name="code" required></div><div class="col-md-6"><label class="form-label">Tên phòng</label><input class="form-control" name="name" required></div><div class="col-md-6"><label class="form-label">Tòa nhà</label><select class="form-select" name="building_id">${meta.buildings.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select></div><div class="col-md-6"><label class="form-label">Loại phòng</label><select class="form-select" name="room_type_id">${meta.room_types.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select></div><div class="col-md-4"><label class="form-label">Sức chứa</label><input class="form-control" type="number" min="1" name="capacity" value="30"></div><div class="col-md-4"><label class="form-label">Tầng</label><input class="form-control" type="number" min="0" name="floor" value="1"></div><div class="col-md-4"><label class="form-label">Mô tả</label><input class="form-control" name="description"></div><div class="col-12"><button class="btn btn-primary">Tạo phòng</button> <button type="button" class="btn btn-light" onclick="managerTab('rooms')">Quay lại</button></div></form></div>`;
+    host.innerHTML = `<div class="panel"><h5>Thêm phòng mới</h5><form id="create-room-form" class="row g-3"><div class="col-md-6"><label class="form-label">Mã phòng</label><input class="form-control" name="code" required></div><div class="col-md-6"><label class="form-label">Tên phòng</label><input class="form-control" name="name" required></div><div class="col-md-6"><label class="form-label">Tòa nhà</label><select class="form-select" name="building_id">${meta.buildings.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select></div><div class="col-md-6"><label class="form-label">Loại phòng</label><select class="form-select" name="room_type_id">${meta.room_types.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select></div><div class="col-md-4"><label class="form-label">Sức chứa</label><input class="form-control" type="number" min="1" name="capacity" value="30"></div><div class="col-md-4"><label class="form-label">Tầng</label><input class="form-control" type="number" min="0" name="floor" value="1"></div><div class="col-md-4"><label class="form-label">Mô tả</label><input class="form-control" name="description"></div><div class="col-12"><button class="btn btn-primary">Tạo phòng</button> <button type="button" class="btn btn-light" onclick="managerPage()">Quay lại</button></div></form></div>`;
     document.getElementById("create-room-form").onsubmit = async (e) => {
       e.preventDefault();
       const o = Object.fromEntries(new FormData(e.target));
@@ -614,8 +609,7 @@ async function showCreateRoom() {
       try {
         await api("/manager/rooms", { method: "POST", body: o });
         alertMsg("Đã tạo phòng");
-        await managerPage();
-        managerTab("rooms");
+        managerPage();
       } catch (x) {
         alertMsg(x.message, "danger");
       }
@@ -623,45 +617,6 @@ async function showCreateRoom() {
   } catch (e) {
     alertMsg(e.message, "danger");
   }
-}
-async function showEditRoom(roomId) {
-  const room = (window.managerData?.rooms || []).find(r => r.id === roomId);
-  if (!room) { alertMsg("Không tìm thấy phòng", "danger"); return; }
-  try {
-    const meta = await api("/rooms/meta");
-    const host = document.getElementById("manager-content");
-    if (!host) return;
-    const options = (items, selected) => items.map(x =>
-      `<option value="${x.id}" ${x.id === selected ? "selected" : ""}>${esc(x.name)}</option>`
-    ).join("");
-    host.innerHTML = `<div class="panel"><h5>Sửa thông tin phòng · ${esc(room.code)}</h5>
-      <form id="edit-room-form" class="row g-3">
-        <div class="col-md-6"><label class="form-label">Mã phòng</label><input class="form-control" name="code" maxlength="30" required></div>
-        <div class="col-md-6"><label class="form-label">Tên phòng</label><input class="form-control" name="name" maxlength="120" required></div>
-        <div class="col-md-6"><label class="form-label">Tòa nhà</label><select class="form-select" name="building_id" required>${options(meta.buildings, room.building_id)}</select></div>
-        <div class="col-md-6"><label class="form-label">Loại phòng</label><select class="form-select" name="room_type_id" required>${options(meta.room_types, room.room_type_id)}</select></div>
-        <div class="col-md-4"><label class="form-label">Sức chứa</label><input class="form-control" type="number" min="1" name="capacity" required></div>
-        <div class="col-md-4"><label class="form-label">Tầng</label><input class="form-control" type="number" min="0" name="floor" required></div>
-        <div class="col-md-4"><label class="form-label">Trạng thái</label><select class="form-select" name="status"><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option><option value="MAINTENANCE">MAINTENANCE</option></select></div>
-        <div class="col-12"><label class="form-label">Mô tả</label><textarea class="form-control" name="description" rows="3"></textarea></div>
-        <div class="col-12 d-flex flex-wrap gap-2"><button class="btn btn-primary" type="submit">Lưu thay đổi</button><button type="button" class="btn btn-light" onclick="managerTab('rooms')">Quay lại</button></div>
-      </form></div>`;
-    const form = document.getElementById("edit-room-form");
-    ["code", "name", "capacity", "floor", "description", "status"].forEach(k => {
-      form.elements[k].value = room[k] ?? "";
-    });
-    form.onsubmit = async e => {
-      e.preventDefault();
-      const data = Object.fromEntries(new FormData(form));
-      ["building_id", "room_type_id", "capacity", "floor"].forEach(k => data[k] = Number(data[k]));
-      try {
-        await api(`/manager/rooms/${roomId}`, {method:"PATCH", body:data});
-        alertMsg("Đã cập nhật thông tin phòng");
-        await managerPage();
-        managerTab("rooms");
-      } catch (err) { alertMsg(err.message, "danger"); }
-    };
-  } catch (err) { alertMsg(err.message, "danger"); }
 }
 async function decision(id, d) {
   if (d === "REJECTED") {
@@ -1069,96 +1024,23 @@ async function saveRule(e, id) {
     alertMsg(x.message, "danger");
   }
 }
-let aiConversationId = null;
-let aiFilters = {};
-let aiBusy = false;
-let aiRoomSnapshots = new Map();
-let aiSnapshotCounter = 0;
-function aiScroll() { const el=document.getElementById('chat');if(el)el.scrollTop=el.scrollHeight; }
-function aiBubble(role,content,extra='') {
-  return `<div class="ai-line ${role==='user'?'ai-line-user':'ai-line-bot'}"><div class="ai-avatar">${role==='user'?'B':'AI'}</div><div class="ai-bubble"><div class="ai-bubble-label">${role==='user'?'Bạn':'UniRoom AI'}</div><div>${esc(content)}</div>${extra}</div></div>`;
-}
-// Each assistant message owns its own room/filter snapshot. Old buttons never
-// accidentally use the newest chat reply's rooms or booking dates.
-function aiRoomCards(rooms,filters={},missing=[]) {
-  if(!Array.isArray(rooms)||!rooms.length)return '';
-  const snapshot=++aiSnapshotCounter;
-  aiRoomSnapshots.set(snapshot,{rooms:rooms.slice(0,3),filters:{...filters}});
-  const complete=!(missing||[]).length && !!filters?.start_at && !!filters?.end_at;
-  const windowLabel=complete ? ` (${esc(String(filters.start_at).slice(0,16).replace('T',' '))} – ${esc(String(filters.end_at).slice(11,16))})` : '';
-  const cards=rooms.slice(0,3).map((r,i)=>`<div class="ai-room-card"><div><strong>${esc(r.code)} · ${esc(r.name)}</strong><div class="small text-muted">${esc(r.building)} · ${Number(r.capacity)} chỗ · ${esc((r.equipment||[]).join(', ')||'Chưa cập nhật thiết bị')}</div><div class="small ${complete && r.availability==='available'?'text-success':'text-warning'}">${complete && r.availability==='available'?'✓ Đã kiểm tra trống'+windowLabel:'Chưa xác nhận lịch trống'}</div></div><button class="btn btn-sm btn-primary" type="button" ${complete && r.availability==='available'?'':'disabled title="Chưa xác nhận phòng trống hoặc thiếu thông tin"'} onclick="aiBookRoom(${snapshot},${i})">Đặt phòng này</button></div>`).join('');
-  return `<div class="ai-room-results">${cards}<button type="button" class="btn btn-outline-primary btn-sm ai-see-more" onclick="showPage('rooms')"><i class="bi bi-search me-1"></i>Xem thêm phòng tại Khám phá phòng</button></div>`;
-}
-function aiBookRoom(snapshot,index) {
-  const entry=aiRoomSnapshots.get(snapshot);if(!entry)return;
-  const room=entry.rooms[index];if(!room)return;
-  const filters=entry.filters;
-  if(room.availability!=='available'||!filters.start_at||!filters.end_at){alertMsg('Cần đủ ngày và giờ trước khi đặt phòng','warning');return;}
-  bookingForm(room.id,room.name,room.capacity,{
-    title:filters.title||'Đặt phòng theo tư vấn UniRoom AI',
-    purpose:filters.purpose||'',attendee_count:filters.min_capacity||1,
-    start_at:filters.start_at,end_at:filters.end_at
-  });
-}
-async function aiShowHistory(){
-  const el=document.getElementById('ai-history-list');if(!el)return;
-  try{
-    const rows=await api('/ai/conversations');
-    el.innerHTML=rows.length?rows.map(x=>`<div class="ai-history-item"><button type="button" class="btn btn-sm btn-outline-primary ai-history-open" onclick="loadAiConversation(${x.id})" title="Xem lại hội thoại">${esc((x.title||'Cuộc hội thoại mới').length>20?(x.title||'Cuộc hội thoại mới').slice(0,20)+'...':(x.title||'Cuộc hội thoại mới'))} <span class="ai-history-date">${esc(x.created_at?new Date(x.created_at).toLocaleDateString('vi-VN'):'')}</span></button><button type="button" class="btn btn-sm btn-outline-danger ai-history-delete" onclick="deleteAiConversation(${x.id})" title="Xóa vĩnh viễn hội thoại" aria-label="Xóa vĩnh viễn hội thoại">×</button></div>`).join(''):'<div class="small text-muted mb-2">Chưa có hội thoại.</div>';
-  }catch(e){alertMsg(e.message,'danger');}
-}
-async function deleteAiConversation(id){
-  if(aiBusy)return;
-  if(!window.confirm(`Bạn có chắc muốn xóa vĩnh viễn hội thoại này và toàn bộ tin nhắn khỏi cơ sở dữ liệu? Không thể hoàn tác.`))return;
-  try{
-    await api(`/ai/conversations/${id}`,{method:'DELETE'});
-    if(aiConversationId===id){aiConversationId=null;aiFilters={};aiRoomSnapshots.clear();const chat=document.getElementById('chat');if(chat)chat.innerHTML='<div class="text-center text-muted small py-4">Hội thoại đã được xóa. Hãy bắt đầu câu hỏi mới.</div>';}
-    await aiShowHistory();
-  }catch(e){alertMsg(e.message,'danger');}
-}
 function aiPage() {
-  aiConversationId=null;aiFilters={};aiRoomSnapshots.clear();aiBusy=false;
-  app.innerHTML=`<div class="row justify-content-center"><div class="col-lg-9"><div class="panel ai-panel">
-    <h2 class="section-title"><i class="bi bi-stars me-2"></i>UniRoom AI Assistant</h2>
-    <p class="muted">Tư vấn phòng theo lịch đặt và bảo trì thực tế. AI không tự tạo hay duyệt booking.</p>
-    <div class="d-flex gap-2 mb-3"><button class="btn btn-sm btn-outline-secondary" id="ai-new">Hội thoại mới</button><button class="btn btn-sm btn-outline-secondary" id="ai-history">Lịch sử</button></div>
-    <div id="ai-history-list" class="ai-history-list mb-2"></div><div id="chat" class="ai-chat" aria-live="polite"><div class="text-center text-muted small py-4">Xin chào! Bạn cần phòng cho bao nhiêu người, ngày nào và khung giờ nào?</div></div>
-    <form id="chat-form" class="d-flex gap-2 mt-3"><input class="form-control" name="message" maxlength="1200" placeholder="Ví dụ: Phòng lab trên 40 người, mai 8h–10h" required autocomplete="off"><button class="btn btn-primary" type="submit">Gửi</button></form>
-    <p class="small muted mt-2">Bạn có thể bổ sung thông tin trong tin nhắn tiếp theo. Chỉ đặt phòng sau khi kiểm tra lại thông tin.</p>
-  </div></div></div>`;
-  document.getElementById('ai-new').onclick=()=>{if(aiBusy)return;aiConversationId=null;aiFilters={};aiRoomSnapshots.clear();document.getElementById('chat').innerHTML='';document.getElementById('ai-history-list').innerHTML='';};
-  document.getElementById('ai-history').onclick=async()=>{if(aiBusy)return;await aiShowHistory();};
-  document.getElementById('chat-form').onsubmit=async(e)=>{
-    e.preventDefault();if(aiBusy)return;
-    const message=String(new FormData(e.target).get('message')||'').trim();if(!message)return;
-    aiBusy=true;const btn=e.target.querySelector('button');btn.disabled=true;
-    const chat=document.getElementById('chat');if(chat.querySelector('.text-center'))chat.innerHTML='';
-    chat.insertAdjacentHTML('beforeend',aiBubble('user',message));e.target.reset();
-    const typing=document.createElement('div');typing.className='ai-line ai-line-bot';typing.innerHTML='<div class="ai-avatar">AI</div><div class="ai-bubble"><div class="ai-bubble-label">UniRoom AI đang trả lời</div><div class="ai-typing" role="status" aria-label="Đang trả lời"><span></span><span></span><span></span></div></div>';
-    chat.appendChild(typing);aiScroll();
-    try{
-      const d=await api('/ai/chat',{method:'POST',body:{message,conversation_id:aiConversationId,filters:aiFilters}});
-      aiConversationId=d.conversation_id;aiFilters=d.filters||{};
-      typing.outerHTML=aiBubble('assistant',d.answer,aiRoomCards(d.rooms||[],aiFilters,d.missing||[]));
-    }catch(x){typing.outerHTML=aiBubble('assistant','Không thể xử lý yêu cầu: '+x.message);}
-    finally{aiBusy=false;btn.disabled=false;aiScroll();e.target.elements.message.focus();}
+  app.innerHTML = `<div class="row justify-content-center"><div class="col-lg-8"><div class="panel"><h2 class="section-title">UniRoom AI Assistant</h2><p class="muted">Trợ lý hỗ trợ tìm phòng và giải thích quy trình. Khi chưa cấu hình AI ngoài, hệ thống dùng chế độ dự phòng nội bộ.</p><div id="chat" class="mb-3"></div><form id="chat-form" class="d-flex gap-2"><input class="form-control" name="message" placeholder="Ví dụ: Tôi cần phòng Lab..." required><button class="btn btn-primary">Gửi</button></form></div></div></div>`;
+  document.getElementById("chat-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    try {
+      const d = await api("/ai/chat", {
+        method: "POST",
+        body: { message: f.get("message") },
+      });
+      document.getElementById("chat").innerHTML +=
+        `<div class="alert alert-light"><b>Bạn:</b> ${esc(f.get("message"))}<br><b>UniRoom:</b> ${esc(d.answer)}</div>`;
+      e.target.reset();
+    } catch (x) {
+      alertMsg(x.message, "danger");
+    }
   };
-}
-async function loadAiConversation(id){
-  if(aiBusy)return;
-  try{
-    const d=await api(`/ai/conversations/${id}`);
-    aiConversationId=d.conversation_id;aiFilters={};aiRoomSnapshots.clear();
-    const html=d.messages.map(m=>{
-      if(m.role==='assistant'){
-        if(m.filters)aiFilters=m.filters;
-        return aiBubble('assistant',m.content,aiRoomCards(m.rooms||[],m.filters||{},m.missing||[]));
-      }
-      return aiBubble(m.role,m.content);
-    }).join('');
-    document.getElementById('chat').innerHTML=html||'<div class="text-center text-muted small py-4">Hội thoại chưa có tin nhắn.</div>';
-    document.getElementById('ai-history-list').innerHTML='';aiScroll();
-  }catch(e){alertMsg(e.message,'danger');}
 }
 async function logout() {
   try {
