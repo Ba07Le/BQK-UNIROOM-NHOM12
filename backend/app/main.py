@@ -439,23 +439,6 @@ def booking_qr(booking_id:int,user=Depends(current_user),db:Session=Depends(get_
         row=models.CheckIn(booking_id=b.id,qr_token=secrets.token_urlsafe(24));db.add(row);db.commit()
     return StreamingResponse(io.BytesIO(qr_png(row.qr_token)),media_type="image/png")
 
-@app.post("/api/ai/chat")
-def ai_chat(payload:dict,user=Depends(current_user),db:Session=Depends(get_db)):
-    question=str(payload.get("message","")).strip()
-    if not question: raise HTTPException(400,"Vui lòng nhập nội dung")
-    conv=models.AIConversation(user_id=user.id);db.add(conv);db.flush()
-    db.add(models.AIMessage(conversation_id=conv.id,role="user",content=question))
-    # Safe local fallback: assistant uses actual room catalogue; no external API key required.
-    rooms=db.query(models.Room).filter_by(status="ACTIVE").all()
-    answer="Mình có thể hỗ trợ bạn tìm phòng, đặt lịch và giải thích quy trình. "
-    if "lab" in question.lower():
-        labs=[r for r in rooms if "lab" in r.name.lower() or "lab" in r.code.lower()]
-        answer += "Các phòng Lab hiện có: " + (", ".join(r.code for r in labs) if labs else "chưa có dữ liệu") + "."
-    else:
-        answer += "Bạn hãy cho biết ngày, giờ, số người và thiết bị cần dùng để mình gợi ý chính xác hơn."
-    db.add(models.AIMessage(conversation_id=conv.id,role="assistant",content=answer));db.commit()
-    return {"success":True,"data":{"conversation_id":conv.id,"answer":answer,"mode":"local-fallback"}}
-
 @app.get("/api/calendar/export.csv")
 def export_csv(user=Depends(current_user),db:Session=Depends(get_db)):
     query=db.query(models.Booking).options(joinedload(models.Booking.room),joinedload(models.Booking.user))
