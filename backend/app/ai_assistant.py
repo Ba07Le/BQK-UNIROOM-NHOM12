@@ -269,13 +269,22 @@ def run_tool(db, user, ctx, name, raw_args):
         log.exception("tool %s failed", name)
         return {"error": "Lỗi hệ thống khi xử lý yêu cầu"}
 
+_INFO = {"t": 0.0, "v": None}
 
+def _static_info(db):
+    if _INFO["v"] is None or time.time() - _INFO["t"] > 60:
+        _INFO["v"] = (
+            [t.name for t in db.query(models.RoomType).all()],
+            [f"{b.name} ({b.code})" for b in db.query(models.Building).all()],
+            [e.name for e in db.query(models.Equipment).all()],
+            "; ".join(_rules_text(db)),
+        )
+        _INFO["t"] = time.time()
+    return _INFO["v"]
 # ---------------------------------------------------------------- prompt + LLM loop
 def build_system_prompt(db: Session, user) -> str:
     now = datetime.now()
-    types = [t.name for t in db.query(models.RoomType).all()]
-    buildings = [f"{b.name} ({b.code})" for b in db.query(models.Building).all()]
-    equip = [e.name for e in db.query(models.Equipment).all()]
+    types, buildings, equip, rules = _static_info(db)
     return f"""Bạn là trợ lý đặt phòng của UniRoom (trường đại học). Luôn trả lời bằng tiếng Việt, ngắn gọn, thân thiện.
 Người dùng: {user.full_name}.
 Bây giờ là {WEEKDAYS[now.weekday()]}, {now.strftime('%d/%m/%Y %H:%M')} (giờ Việt Nam). Dùng mốc này để đổi "mai", "thứ Hai tuần sau"... thành ngày giờ cụ thể.
