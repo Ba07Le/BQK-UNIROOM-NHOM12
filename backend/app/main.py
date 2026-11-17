@@ -4,7 +4,7 @@ from typing import Optional
 from pathlib import Path
 FRONTEND_STATIC = Path(__file__).resolve().parents[2] / "frontend" / "static"
 from fastapi import FastAPI, Depends, HTTPException, status, Header
-from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
+from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
@@ -23,6 +23,16 @@ app.mount("/static", StaticFiles(directory=str(FRONTEND_STATIC)), name="static")
 @app.get("/", response_class=HTMLResponse)
 def home():
     return FileResponse(str(FRONTEND_STATIC / "index.html"))
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    # Pages declare their own inline icon; this just stops the 404 in the console.
+    return Response(status_code=204)
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_page():
+    # Page shell only; admin.js verifies the ADMIN role, and every /api/admin/* call is protected by require_roles("ADMIN").
+    return FileResponse(str(FRONTEND_STATIC / "admin.html"))
 
 @app.get("/api/health")
 def health(db: Session = Depends(get_db)):

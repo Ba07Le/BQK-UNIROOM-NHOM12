@@ -1,0 +1,10 @@
+body.ur-admin .panel,body.ur-admin .stat{background:#fff;border:1px solid #e2e8e9;border-radius:14px;padding:18px;box-shadow:0 6px 25px rgba(28,49,61,.045)}
+body.ur-admin .stat{display:flex;flex-direction:column;gap:4px}
+body.ur-admin .stat strong{font-size:1.8rem;line-height:1.2}
+body.ur-admin .muted{color:var(--ur-muted)}
+body.ur-admin .panel h5{font-weight:700;margin-bottom:14px}
+body.ur-admin .table thead th{font-size:.76rem;letter-spacing:.035em;text-transform:uppercase;color:#607186}
+.admin-rank{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #eef1f3}
+.admin-rank:last-child{border-bottom:0}
+.admin-rank-track{flex:1;height:8px;background:#e8eef1;border-radius:99px;overflow:hidden}
+.admin-rank-track div{height:100%;background:var(--ur-brand);border-radius:99px}

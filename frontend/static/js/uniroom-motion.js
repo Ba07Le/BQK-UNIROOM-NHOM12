@@ -3,7 +3,7 @@
   'use strict';
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   if (reduced.matches) return;
-  const hosts = ['app', 'rm-content', 'room-results', 'admin-booking-list'];
+  const hosts = ['app', 'rm-content', 'room-results', 'admin-booking-list', 'admin-content'];
   const selector = ':scope > .row > [class*="col-"], :scope > .panel, :scope > .card, :scope > .page-heading, :scope > .rm-heading, :scope > .row, :scope > .rm-card, :scope > .table-responsive';
   const animate = (host) => {
     if (!host || !host.isConnected) return;

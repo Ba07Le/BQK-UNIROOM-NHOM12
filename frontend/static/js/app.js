@@ -86,6 +86,11 @@ function syncNav() {
     ["ADMIN", "ROOM_MANAGER"].includes(role) ? "Lịch tổng quan" : "Lịch cá nhân";
 }
 function showPage(p) {
+  // Admin has its own separate site.
+  if (me?.role === "ADMIN") {
+    window.location.assign("/static/admin.html#dashboard");
+    return;
+  }
   // Room Manager chưa sử dụng Dashboard và trang Duyệt booking.
   if (p === "manager" || (p === "dashboard" && me?.role === "ROOM_MANAGER")) {
     window.location.assign("/static/room-manager.html");
@@ -1156,10 +1161,15 @@ async function initializeApp() {
     localStorage.removeItem("uniroom_user");
   }
   syncNav();
+  // Deep links from Admin / Room Manager pages, e.g. /#rooms, /#calendar.
+  const routes = ["home", "rooms", "calendar", "profile", "notifications", "ai", "dashboard", "login", "register"];
+  const authOnly = ["calendar", "profile", "notifications", "ai", "dashboard"];
+  const want = routes.includes(location.hash.slice(1)) ? location.hash.slice(1) : null;
+  if (want) history.replaceState(null, "", location.pathname + location.search);
   if (token && me) {
-    showPage(me.role === "ROOM_MANAGER" ? "home" : me.role === "ADMIN" ? "adminDashboard" : "dashboard");
+    showPage(want || (me.role === "ROOM_MANAGER" ? "home" : "dashboard"));
   } else {
-    showPage("home");
+    showPage(want ? (authOnly.includes(want) ? "login" : want) : "home");
   }
 }
 initializeApp();
