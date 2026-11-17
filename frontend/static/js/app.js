@@ -70,7 +70,6 @@ function syncNav() {
   setNavVisible("nav-calendar", logged);
   setNavVisible("nav-notifications", logged && role === "USER");
   setNavVisible("nav-user", logged);
-  setNavVisible("nav-ai", logged && role === "USER");
   setNavVisible("nav-auth", !logged);
   setNavVisible("nav-register", !logged);
   setNavVisible("nav-logout", logged);
@@ -122,7 +121,6 @@ function showPage(p) {
     profile: profilePage,
     manager: managerPage,
     admin: adminPage,
-    ai: aiPage,
   })[p]?.();
 }
 function homePage() {
@@ -155,9 +153,9 @@ function homePage() {
 <section class="home-section intro-section"><div class="section-heading text-center"><span class="eyebrow">UNIROOM LÀ GÌ?</span><h2>Mọi thứ cần thiết để<br><span>đặt phòng dễ dàng hơn.</span></h2><p>Thay vì tìm thông tin ở nhiều nơi, UniRoom tập trung các bước quan trọng trong một quy trình thống nhất.</p></div><div class="row g-4 mt-2"><div class="col-md-4"><article class="feature-card"><div class="feature-icon icon-blue"><i class="bi bi-compass"></i></div><span class="feature-number">01 / DISCOVER</span><h3>Tìm đúng không gian</h3><p>Tìm theo tên, mã phòng và sức chứa để nhanh chóng thu hẹp lựa chọn phù hợp với nhu cầu.</p><a href="#" onclick="showPage('rooms')">Bắt đầu tìm phòng <i class="bi bi-arrow-up-right"></i></a></article></div><div class="col-md-4"><article class="feature-card"><div class="feature-icon icon-purple"><i class="bi bi-calendar2-plus"></i></div><span class="feature-number">02 / BOOK</span><h3>Gửi yêu cầu đặt lịch</h3><p>Chọn thời gian sử dụng, số người tham gia và mục đích để gửi yêu cầu đến hệ thống.</p><a href="#" onclick="showPage('rooms')">Xem quy trình đặt <i class="bi bi-arrow-up-right"></i></a></article></div><div class="col-md-4"><article class="feature-card"><div class="feature-icon icon-green"><i class="bi bi-clipboard2-check"></i></div><span class="feature-number">03 / MANAGE</span><h3>Theo dõi chủ động</h3><p>Kiểm tra trạng thái booking, lịch cá nhân và thông báo ngay trong tài khoản của bạn.</p><a href="#" onclick="showPage(token?'dashboard':'login')">Mở tài khoản <i class="bi bi-arrow-up-right"></i></a></article></div></div></section>
 <section class="home-section spaces-section"><div class="row align-items-end g-3 mb-4"><div class="col-lg-8"><span class="eyebrow">KHÔNG GIAN SỬ DỤNG</span><h2 class="section-title display-6 mt-2">Một nền tảng, nhiều<br>nhu cầu học tập.</h2></div><div class="col-lg-4"><p class="muted mb-1">Khám phá danh sách phòng được quản lý trên hệ thống. Thông tin chi tiết và sức chứa được hiển thị theo dữ liệu thực tế.</p></div></div><div class="row g-4"><div class="col-lg-6"><div class="space-card space-classroom"><div class="space-card-art"><div class="art-window"></div><div class="art-board"></div><div class="art-desk desk-one"></div><div class="art-desk desk-two"></div><div class="art-desk desk-three"></div></div><div class="space-card-content"><span class="space-tag">HỌC TẬP & THẢO LUẬN</span><h3>Phòng học đa năng</h3><p>Không gian dành cho lớp học, làm việc nhóm, trao đổi và các hoạt động học thuật.</p><button class="btn btn-space" onclick="showPage('rooms')">Tìm phòng học <i class="bi bi-arrow-right"></i></button></div></div></div><div class="col-lg-6"><div class="space-card space-lab"><div class="space-card-art"><div class="lab-screen"></div><div class="lab-chip"><i class="bi bi-cpu"></i></div><div class="lab-table"></div><div class="lab-device device-one"></div><div class="lab-device device-two"></div></div><div class="space-card-content"><span class="space-tag">THỰC HÀNH & NGHIÊN CỨU</span><h3>Phòng Lab chuyên dụng</h3><p>Không gian thực hành và sử dụng thiết bị phục vụ học tập, nghiên cứu chuyên môn.</p><button class="btn btn-space" onclick="showPage('rooms')">Tìm phòng Lab <i class="bi bi-arrow-right"></i></button></div></div></div></div></section>
 <section class="home-section process-section"><div class="section-heading text-center"><span class="eyebrow">CÁCH SỬ DỤNG</span><h2>Đặt phòng qua <span>4 bước đơn giản.</span></h2><p>Quy trình được thiết kế trực quan để người dùng dễ bắt đầu và dễ theo dõi.</p></div><div class="process-line"><div class="process-step"><div class="process-icon"><i class="bi bi-person-plus"></i></div><span>BƯỚC 01</span><h4>Tạo tài khoản</h4><p>Đăng ký hoặc đăng nhập vào UniRoom.</p></div><div class="process-step"><div class="process-icon"><i class="bi bi-search"></i></div><span>BƯỚC 02</span><h4>Tìm kiếm phòng</h4><p>Lọc phòng theo thông tin và sức chứa.</p></div><div class="process-step"><div class="process-icon"><i class="bi bi-calendar2-plus"></i></div><span>BƯỚC 03</span><h4>Gửi yêu cầu</h4><p>Chọn thời gian và gửi thông tin đặt phòng.</p></div><div class="process-step"><div class="process-icon"><i class="bi bi-bell"></i></div><span>BƯỚC 04</span><h4>Theo dõi kết quả</h4><p>Xem trạng thái và lịch sử trong tài khoản.</p></div></div></section>
-<section class="home-section tools-section"><div class="row align-items-center g-5"><div class="col-lg-5"><span class="eyebrow">CÔNG CỤ ĐỒNG HÀNH</span><h2 class="section-title display-6 mt-2">Không chỉ đặt phòng.<br><span class="text-gradient">Còn quản lý thuận tiện.</span></h2><p class="muted mt-3">Các tiện ích hỗ trợ người dùng trong suốt quá trình sử dụng phòng và theo dõi lịch đặt.</p><button class="btn btn-primary btn-lg mt-2" onclick="showPage(token?'dashboard':'register')">${token ? "Vào bảng điều khiển" : "Bắt đầu sử dụng"} <i class="bi bi-arrow-right ms-2"></i></button></div><div class="col-lg-7"><div class="tools-grid"><div class="tool-tile"><span class="tool-icon"><i class="bi bi-calendar3"></i></span><h5>Lịch cá nhân</h5><p>Tập trung các lịch đặt phòng đã tạo.</p></div><div class="tool-tile"><span class="tool-icon purple"><i class="bi bi-bell"></i></span><h5>Thông báo</h5><p>Cập nhật thông tin và trạng thái booking.</p></div><div class="tool-tile"><span class="tool-icon green"><i class="bi bi-qr-code"></i></span><h5>QR check-in</h5><p>Hỗ trợ thao tác check-in theo booking.</p></div><div class="tool-tile"><span class="tool-icon orange"><i class="bi bi-file-earmark-arrow-down"></i></span><h5>Xuất báo cáo</h5><p>Hỗ trợ xuất dữ liệu lịch theo định dạng hệ thống.</p></div><div class="tool-tile tool-tile-wide"><span class="tool-icon dark"><i class="bi bi-stars"></i></span><div><h5>UniRoom AI Assistant</h5><p>Trợ lý hỗ trợ giải đáp và định hướng tìm phòng.</p><button class="btn btn-sm btn-outline-primary" onclick="showPage(token?'ai':'login')">Trải nghiệm trợ lý <i class="bi bi-arrow-up-right"></i></button></div></div></div></div></div></section>
+<section class="home-section tools-section"><div class="row align-items-center g-5"><div class="col-lg-5"><span class="eyebrow">CÔNG CỤ ĐỒNG HÀNH</span><h2 class="section-title display-6 mt-2">Không chỉ đặt phòng.<br><span class="text-gradient">Còn quản lý thuận tiện.</span></h2><p class="muted mt-3">Các tiện ích hỗ trợ người dùng trong suốt quá trình sử dụng phòng và theo dõi lịch đặt.</p><button class="btn btn-primary btn-lg mt-2" onclick="showPage(token?'dashboard':'register')">${token ? "Vào bảng điều khiển" : "Bắt đầu sử dụng"} <i class="bi bi-arrow-right ms-2"></i></button></div><div class="col-lg-7"><div class="tools-grid"><div class="tool-tile"><span class="tool-icon"><i class="bi bi-calendar3"></i></span><h5>Lịch cá nhân</h5><p>Tập trung các lịch đặt phòng đã tạo.</p></div><div class="tool-tile"><span class="tool-icon purple"><i class="bi bi-bell"></i></span><h5>Thông báo</h5><p>Cập nhật thông tin và trạng thái booking.</p></div><div class="tool-tile"><span class="tool-icon green"><i class="bi bi-qr-code"></i></span><h5>QR check-in</h5><p>Hỗ trợ thao tác check-in theo booking.</p></div><div class="tool-tile"><span class="tool-icon orange"><i class="bi bi-file-earmark-arrow-down"></i></span><h5>Xuất báo cáo</h5><p>Hỗ trợ xuất dữ liệu lịch theo định dạng hệ thống.</p></div></div></div></div></section>
 <section class="home-cta"><div><span class="eyebrow eyebrow-light">SẴN SÀNG BẮT ĐẦU?</span><h2>Không gian tốt bắt đầu<br>từ một lịch đặt rõ ràng.</h2><p>Khám phá phòng học và phòng Lab đang được quản lý trên UniRoom.</p></div><div class="cta-actions"><button class="btn btn-light btn-lg" onclick="showPage('rooms')">Khám phá phòng <i class="bi bi-arrow-right ms-2"></i></button>${token ? "" : '<button class="btn btn-outline-light btn-lg" onclick="showPage(\'register\')">Tạo tài khoản</button>'}</div></section>
-<section class="home-section faq-section"><div class="row g-5"><div class="col-lg-4"><span class="eyebrow">CÂU HỎI THƯỜNG GẶP</span><h2 class="section-title display-6 mt-2">Bạn muốn<br>biết thêm?</h2><p class="muted">Một vài thông tin cơ bản để bạn bắt đầu sử dụng UniRoom thuận lợi hơn.</p></div><div class="col-lg-8"><div class="accordion accordion-flush" id="homeFaq"><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq1">Tôi có cần tài khoản để đặt phòng không?</button></h3><div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#homeFaq"><div class="accordion-body">Bạn cần đăng ký và đăng nhập để gửi yêu cầu đặt phòng, xem lịch cá nhân và quản lý các booking của mình.</div></div></div><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq2">Làm thế nào để biết yêu cầu đã được duyệt?</button></h3><div id="faq2" class="accordion-collapse collapse" data-bs-parent="#homeFaq"><div class="accordion-body">Bạn có thể theo dõi trạng thái booking và thông báo trong bảng điều khiển cá nhân.</div></div></div><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq3">Tôi có thể xem lịch đặt phòng ở đâu?</button></h3><div id="faq3" class="accordion-collapse collapse" data-bs-parent="#homeFaq"><div class="accordion-body">Sau khi đăng nhập, mở mục Lịch cá nhân trên thanh điều hướng để xem lịch đặt đã được đồng bộ.</div></div></div><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq4">Nếu cần hỗ trợ tìm phòng thì sao?</button></h3><div id="faq4" class="accordion-collapse collapse" data-bs-parent="#homeFaq"><div class="accordion-body">Bạn có thể sử dụng bộ lọc tìm kiếm phòng hoặc mở UniRoom AI Assistant từ tài khoản.</div></div></div></div></div></div></section>`;
+<section class="home-section faq-section"><div class="row g-5"><div class="col-lg-4"><span class="eyebrow">CÂU HỎI THƯỜNG GẶP</span><h2 class="section-title display-6 mt-2">Bạn muốn<br>biết thêm?</h2><p class="muted">Một vài thông tin cơ bản để bạn bắt đầu sử dụng UniRoom thuận lợi hơn.</p></div><div class="col-lg-8"><div class="accordion accordion-flush" id="homeFaq"><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq1">Tôi có cần tài khoản để đặt phòng không?</button></h3><div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#homeFaq"><div class="accordion-body">Bạn cần đăng ký và đăng nhập để gửi yêu cầu đặt phòng, xem lịch cá nhân và quản lý các booking của mình.</div></div></div><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq2">Làm thế nào để biết yêu cầu đã được duyệt?</button></h3><div id="faq2" class="accordion-collapse collapse" data-bs-parent="#homeFaq"><div class="accordion-body">Bạn có thể theo dõi trạng thái booking và thông báo trong bảng điều khiển cá nhân.</div></div></div><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq3">Tôi có thể xem lịch đặt phòng ở đâu?</button></h3><div id="faq3" class="accordion-collapse collapse" data-bs-parent="#homeFaq"><div class="accordion-body">Sau khi đăng nhập, mở mục Lịch cá nhân trên thanh điều hướng để xem lịch đặt đã được đồng bộ.</div></div></div><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq4">Nếu cần hỗ trợ tìm phòng thì sao?</button></h3><div id="faq4" class="accordion-collapse collapse" data-bs-parent="#homeFaq"><div class="accordion-body">Bạn có thể sử dụng bộ lọc tìm kiếm phòng theo tên phòng, mã phòng và sức chứa.</div></div></div></div></div></div></section>`;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 function loginPage() {
@@ -281,7 +279,7 @@ async function dashboardPage() {
             `<div class="border-bottom py-2"><b>${esc(n.title)}</b><div class="muted small">${esc(n.body)}</div></div>`,
         )
         .join("") || '<p class="muted">Chưa có thông báo.</p>'
-    }</div>${me?.role === "USER" ? `<div class="panel mt-3"><div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Danh sách chờ (Waitlist)</h5><span class="badge text-bg-primary">${waitlist.filter(x=>x.status==="WAITING").length} đang chờ</span></div>${waitlist.length ? `<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Phòng</th><th>Thời gian</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${waitlist.map(w=>`<tr><td>${esc(w.room_code)}</td><td>${new Date(w.start_at).toLocaleString("vi-VN")} – ${new Date(w.end_at).toLocaleString("vi-VN")}</td><td><span class="badge ${w.status==="NOTIFIED"?"text-bg-success":"text-bg-secondary"}">${esc(w.status)}</span></td><td>${["WAITING","NOTIFIED"].includes(w.status)?`<button class="btn btn-sm btn-outline-danger" onclick="leaveWaitlist(${w.id})">Rời danh sách</button>`:""} ${w.status==="NOTIFIED"?`<button class="btn btn-sm btn-primary" onclick="openWaitlistBooking(${w.room_id},'${esc(w.room_code)}',${JSON.stringify(w.start_at)},${JSON.stringify(w.end_at)})">Đặt phòng</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:"<p class='muted mb-0'>Chưa tham gia danh sách chờ.</p>"}</div>` : ""}<div class="mt-3"><button class="btn btn-outline-primary" onclick="showPage('ai')">Mở AI Assistant</button></div>`;
+    }</div>${me?.role === "USER" ? `<div class="panel mt-3"><div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Danh sách chờ (Waitlist)</h5><span class="badge text-bg-primary">${waitlist.filter(x=>x.status==="WAITING").length} đang chờ</span></div>${waitlist.length ? `<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Phòng</th><th>Thời gian</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${waitlist.map(w=>`<tr><td>${esc(w.room_code)}</td><td>${new Date(w.start_at).toLocaleString("vi-VN")} – ${new Date(w.end_at).toLocaleString("vi-VN")}</td><td><span class="badge ${w.status==="NOTIFIED"?"text-bg-success":"text-bg-secondary"}">${esc(w.status)}</span></td><td>${["WAITING","NOTIFIED"].includes(w.status)?`<button class="btn btn-sm btn-outline-danger" onclick="leaveWaitlist(${w.id})">Rời danh sách</button>`:""} ${w.status==="NOTIFIED"?`<button class="btn btn-sm btn-primary" onclick="openWaitlistBooking(${w.room_id},'${esc(w.room_code)}',${JSON.stringify(w.start_at)},${JSON.stringify(w.end_at)})">Đặt phòng</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:"<p class='muted mb-0'>Chưa tham gia danh sách chờ.</p>"}</div>` : ""}`;
   } catch (e) {
     alertMsg(e.message, "danger");
   }
@@ -1063,67 +1061,6 @@ async function saveRule(e, id) {
     alertMsg(x.message, "danger");
   }
 }
-let aiConvId = null;
-function aiPage() {
-  app.innerHTML = `<div class="row justify-content-center"><div class="col-lg-8"><div class="panel">
-    <div class="d-flex justify-content-between align-items-start gap-2">
-      <div><h2 class="section-title">UniRoom AI Assistant</h2>
-      <p class="muted">Hỏi phòng trống, nhờ gợi ý phòng phù hợp hoặc đặt phòng ngay trong cuộc trò chuyện.</p></div>
-      <button type="button" id="chat-new" class="btn btn-sm btn-outline-secondary">Cuộc mới</button>
-    </div>
-    <div id="chat" class="mb-3 d-flex flex-column gap-2" style="height:420px;overflow-y:auto"></div>
-    <form id="chat-form" class="d-flex gap-2">
-      <input class="form-control" name="message" maxlength="1000" autocomplete="off" required
-        placeholder="Ví dụ: Phòng nào trống chiều mai 14h-16h, 40 người, có máy chiếu?">
-      <button class="btn btn-primary">Gửi</button>
-    </form></div></div></div>`;
-
-  const chat = document.getElementById("chat");
-  const form = document.getElementById("chat-form");
-  const add = (text, who, cls) => {
-    const d = document.createElement("div");
-    d.className = cls || (who === "me" ? "alert alert-primary mb-0 align-self-end" : "alert alert-light mb-0 align-self-start");
-    d.style.cssText = "max-width:85%;white-space:pre-wrap";
-    d.textContent = text;
-    chat.appendChild(d);
-    chat.scrollTop = chat.scrollHeight;
-    return d;
-  };
-  const reset = () => {
-    aiConvId = null;
-    chat.innerHTML = "";
-    add("Xin chào! Mình giúp bạn tìm phòng trống, gợi ý phòng phù hợp và đặt phòng.", "ai");
-  };
-  reset();
-  document.getElementById("chat-new").onclick = reset;
-
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const input = form.elements.message;
-    const btn = form.querySelector("button");
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = "";
-    add(text, "me");
-    btn.disabled = true;
-    const wait = add("Đang trả lời...", "ai");
-    try {
-      const d = await api("/ai/chat", {
-        method: "POST",
-        body: { message: text, conversation_id: aiConvId },
-      });
-      aiConvId = d.conversation_id;
-      wait.textContent = d.answer;
-    } catch (x) {
-      wait.textContent = x.message;
-      wait.className = "alert alert-danger mb-0 align-self-start";
-    } finally {
-      btn.disabled = false;
-      input.focus();
-      chat.scrollTop = chat.scrollHeight;
-    }
-  };
-}
 async function logout() {
   try {
     await api("/auth/logout", { method: "POST" });
@@ -1162,8 +1099,8 @@ async function initializeApp() {
   }
   syncNav();
   // Deep links from Admin / Room Manager pages, e.g. /#rooms, /#calendar.
-  const routes = ["home", "rooms", "calendar", "profile", "notifications", "ai", "dashboard", "login", "register"];
-  const authOnly = ["calendar", "profile", "notifications", "ai", "dashboard"];
+  const routes = ["home", "rooms", "calendar", "profile", "notifications", "dashboard", "login", "register"];
+  const authOnly = ["calendar", "profile", "notifications", "dashboard"];
   const want = routes.includes(location.hash.slice(1)) ? location.hash.slice(1) : null;
   if (want) history.replaceState(null, "", location.pathname + location.search);
   if (token && me) {
