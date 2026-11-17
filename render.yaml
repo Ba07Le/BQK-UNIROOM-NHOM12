@@ -1,0 +1,19 @@
+# Place this file at the REPO ROOT (BQK-UNIROOM-NHOM12/render.yaml).
+services:
+  - type: web
+    name: uniroom
+    runtime: python
+    plan: free
+    # If requirements.txt is in the repo root instead of backend/, remove "backend/" below.
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: TZ
+        value: Asia/Ho_Chi_Minh
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false   # paste your Neon string in the Render dashboard
